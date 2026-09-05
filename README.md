@@ -71,12 +71,69 @@ White-perspective pawn units (`34` centipawns is `0.34`); mate results use a
 separate `mate` object and keep `evaluation` as `null`. Poll responses are
 marked `Cache-Control: no-store`.
 
+## Factual response contract
+
+Completed responses from the upgraded worker also include `facts`,
+`explanation`, and `explanation_version`. Version `1` is the first factual
+contract. Queued, running, failed, and older completed rows without a saved
+bundle return those fields as `null`; the existing score or mate result stays
+unchanged. The worker persists the full `factual_result` internally and the
+API maps it onto the response fields when a bundle exists.
+
+Worked example:
+
+```json
+{
+  "fen": "6k1/5ppp/8/8/3P4/8/5PPP/6K1 w - - 0 1"
+}
+```
+
+The corresponding factual payload is:
+
+```json
+{
+  "task_id": "3a2676b5-b76d-4fdb-a58f-e2ddb692ff60",
+  "status": "completed",
+  "evaluation": 1.23,
+  "facts": {
+    "material": {
+      "white": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 4},
+      "black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 3},
+      "white_minus_black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 1}
+    },
+    "pawns": {
+      "white": {
+        "isolated": ["d4"],
+        "doubled_files": {},
+        "passed": ["d4"]
+      },
+      "black": {
+        "isolated": [],
+        "doubled_files": {},
+        "passed": []
+      }
+    },
+    "files": {
+      "open": ["a", "b", "c", "e"],
+      "semi_open": {"white": [], "black": ["d"]}
+    }
+  },
+  "explanation": "White has one more pawn than Black. White's d4-pawn is isolated and passed. The a-, b-, c-, and e-files are open; the d-file is semi-open for Black.",
+  "explanation_version": 1
+}
+```
+
+The version only changes when the fact definitions, selection rules, or
+templates change. Polling never rewrites historical results with newer prose.
+
 ## Tests
 
 Tests run in containers against a separate PostgreSQL service and named volume;
 the normal `chess-data` volume is not used by the test stack. The in-process
 worker uses the real Stockfish binary for the end-to-end path and the
 integration checks avoid asserting a time-dependent exact centipawn score.
+The `test` service runs `python -m pytest -q` inside the image so the app
+package is on `sys.path` in that container image.
 
 ```sh
 docker compose --profile test build test

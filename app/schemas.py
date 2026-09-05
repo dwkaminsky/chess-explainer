@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 
+from .facts.models import PositionFacts
 from .fen import normalize_fen
 
 
@@ -45,18 +46,20 @@ class MateResult(BaseModel):
     moves: int = Field(ge=0)
 
 
-class TaskResult(BaseModel):
-    """Response shape used by the API for queued, running, and terminal rows.
+TaskFacts = PositionFacts
 
-    The API intentionally controls omission of ``mate`` and ``error`` in its
-    JSON response so ordinary scores and mate scores remain distinct.
-    """
+
+class TaskResult(BaseModel):
+    """Response shape used by the API for queued, running, and terminal rows."""
 
     model_config = ConfigDict(extra="forbid")
 
     task_id: UUID
     status: TaskStatus
     evaluation: float | None = None
+    facts: TaskFacts | None = None
+    explanation: StrictStr | None = None
+    explanation_version: int | None = None
     mate: MateResult | None = None
     error: TaskError | None = None
 
@@ -73,6 +76,7 @@ __all__ = [
     "SubmitTaskRequest",
     "TaskCreate",
     "TaskError",
+    "TaskFacts",
     "TaskResponse",
     "TaskResult",
     "TaskStatus",

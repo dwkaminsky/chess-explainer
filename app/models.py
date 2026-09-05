@@ -46,6 +46,9 @@ class Task(Base):
     error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     engine_version: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    factual_result: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
     evaluation_config: Mapped[dict[str, Any]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=False
     )
@@ -96,6 +99,10 @@ class Task(Base):
             "status NOT IN ('completed', 'failed') OR "
             "(finished_at IS NOT NULL AND lease_token IS NULL AND lease_expires_at IS NULL)",
             name="ck_tasks_terminal_fields",
+        ),
+        CheckConstraint(
+            "status = 'completed' OR factual_result IS NULL",
+            name="ck_tasks_factual_result_completed_only",
         ),
         # PostgreSQL uses these predicates to keep the queue indexes small.  The
         # predicates are portable enough for SQLite's test schema as well.

@@ -16,6 +16,7 @@ from typing import Any, Literal
 from sqlalchemy import Select, and_, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .facts.models import FactualResult
 from .models import Task, TaskStatus
 
 MAX_ATTEMPTS = 2
@@ -110,6 +111,7 @@ async def claim_one(
         task.evaluation_cp = None
         task.mate_winner = None
         task.mate_moves = None
+        task.factual_result = None
         task.error_code = None
         task.error_message = None
         task.engine_version = None
@@ -163,6 +165,7 @@ def _clear_attempt(task: Task) -> None:
     task.evaluation_cp = None
     task.mate_winner = None
     task.mate_moves = None
+    task.factual_result = None
     task.engine_version = None
     task.finished_at = None
     task.error_code = None
@@ -187,6 +190,7 @@ async def complete_task(
     mate_winner: Literal["white", "black"] | None = None,
     mate_moves: int | None = None,
     engine_version: str | None = None,
+    factual_result: dict[str, Any],
 ) -> bool:
     """Persist a successful attempt if its token and lease are still valid."""
 
@@ -196,6 +200,7 @@ async def complete_task(
         raise ValueError("provide exactly one complete ordinary or mate result")
     if mate and (mate_winner not in ("white", "black") or mate_moves is None or mate_moves < 0):
         raise ValueError("mate result requires winner and nonnegative moves")
+    factual_bundle = FactualResult.model_validate(factual_result).model_dump(mode="json")
     if session.in_transaction():
         await session.commit()
     async with session.begin():
@@ -208,6 +213,7 @@ async def complete_task(
                 mate_winner=mate_winner,
                 mate_moves=mate_moves,
                 engine_version=engine_version,
+                factual_result=factual_bundle,
                 error_code=None,
                 error_message=None,
                 lease_token=None,
@@ -226,6 +232,7 @@ async def fail_or_retry(
     error_code: str,
     error_message: str,
     max_attempts: int = MAX_ATTEMPTS,
+    terminal: bool = False,
 ) -> Literal["requeued", "failed", "stale"]:
     """Retry a failed attempt once, or publish a client-visible failure.
 
@@ -242,7 +249,7 @@ async def fail_or_retry(
         )
         if task is None:
             return "stale"
-        if task.attempts < max_attempts:
+        if not terminal and task.attempts < max_attempts:
             _clear_attempt(task)
             task.status = TaskStatus.QUEUED.value
             outcome: Literal["requeued", "failed"] = "requeued"
@@ -264,7 +271,31 @@ recover_expired_tasks = recover_expired
 claim_next_task = claim_one
 persist_failure = fail_or_retry
 retry_task = fail_or_retry
-# The worker chooses fail_task after the second attempt.  The same guarded
-# implementation is safe for that path and still returns ``failed``.
-fail_task = fail_or_retry
 save_result = complete_task
+
+
+async def fail_task(
+    session: AsyncSession,
+    task_id: uuid.UUID,
+    lease_token: uuid.UUID,
+    error_code: str,
+    error_message: str,
+    *,
+    max_attempts: int = MAX_ATTEMPTS,
+) -> Literal["failed", "stale"]:
+    """Terminally fail a task regardless of remaining retry budget."""
+
+    outcome = await fail_or_retry(
+        session,
+        task_id,
+        lease_token,
+        error_code=error_code,
+        error_message=error_message,
+        max_attempts=max_attempts,
+        terminal=True,
+    )
+    if outcome == "requeued":
+        # The terminal path should never requeue; preserve the guarded contract
+        # by converting the impossible outcome into a failure signal.
+        return "failed"
+    return outcome
