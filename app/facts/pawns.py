@@ -68,4 +68,3 @@ def extract_pawn_facts(board: chess.Board) -> PawnFacts:
         white=_side_facts(board, chess.WHITE),
         black=_side_facts(board, chess.BLACK),
     )
-

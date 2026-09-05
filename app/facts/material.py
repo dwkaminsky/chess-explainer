@@ -26,4 +26,3 @@ def extract_material(board: chess.Board) -> MaterialFacts:
         for piece in PIECE_ORDER
     }
     return MaterialFacts(white=white, black=black, white_minus_black=PieceDelta(**deltas))
-

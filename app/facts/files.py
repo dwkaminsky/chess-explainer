@@ -25,4 +25,3 @@ def extract_file_facts(board: chess.Board) -> FileFacts:
             semi_black.append(file_name)
 
     return FileFacts(open=open_files, semi_open=SemiOpenFiles(white=semi_white, black=semi_black))
-
