@@ -7,11 +7,9 @@ from .grammar import (
     count_word,
     format_file_open_clause,
     format_file_list,
-    format_isolated_sentence,
+    format_file_semi_open_clause,
     format_material_sentence,
-    format_passed_sentence,
     format_square_list,
-    format_square_noun_list,
     format_terminal_sentence,
     join_items,
 )
@@ -27,72 +25,99 @@ def _trim_sentences(sentences: list[str], *, max_words: int = 120) -> list[str]:
     return sentences
 
 
-def _doubled_group_clause(
+def _doubled_clause(
     file_name: str,
     squares: list[str],
+    isolated: set[str],
+    passed: set[str],
 ) -> str:
     if len(squares) == 2:
-        return f"doubled pawns on the {file_name}-file"
-    return f"{count_word(len(squares))} pawns on the {file_name}-file"
+        clause = f"doubled pawns on {format_square_list(squares)}"
+    else:
+        clause = f"{count_word(len(squares))} pawns on the {file_name}-file: {format_square_list(squares)}"
+    overlap: list[str] = []
+    if set(squares).issubset(isolated):
+        overlap.append("isolated")
+    if set(squares).issubset(passed):
+        overlap.append("passed")
+    if overlap:
+        clause += f"; those pawns are {join_items(overlap)}"
+    return clause
 
 
-def _side_sentences(side: str, facts: PawnFacts) -> list[str]:
+def _side_sentence(side: str, facts: PawnFacts) -> str | None:
     side_facts = getattr(facts, side.lower())
     isolated = list(side_facts.isolated)
     passed = list(side_facts.passed)
     doubled_files = side_facts.doubled_files
 
-    combined = [square for square in isolated if square in passed]
-    isolated_only = [square for square in isolated if square not in combined]
-    passed_only = [square for square in passed if square not in combined]
-    if combined and not isolated_only and not passed_only and not doubled_files:
-        if len(combined) == 1:
-            return [f"{side}'s {combined[0]}-pawn is isolated and passed."]
-        return [f"{side}'s {format_square_noun_list(combined, 'pawn')} are isolated and passed."]
+    if not isolated and not passed and not doubled_files:
+        return None
 
-    sentences: list[str] = []
+    combined = [square for square in isolated if square in passed]
+    doubled_squares = {
+        square
+        for squares in doubled_files.values()
+        for square in squares
+    }
+    combined = [square for square in combined if square not in doubled_squares]
+    isolated_only = [square for square in isolated if square not in combined and square not in doubled_squares]
+    passed_only = [square for square in passed if square not in combined and square not in doubled_squares]
+
+    if combined and not isolated_only and not passed_only and not doubled_files and len(combined) == 1:
+        return f"{side}'s {combined[0]}-pawn is isolated and passed."
+
+    clauses: list[str] = []
     if combined:
         if len(combined) == 1:
-            sentences.append(f"{side}'s {combined[0]}-pawn is isolated and passed.")
+            clauses.append(f"an isolated and passed pawn on {combined[0]}")
         else:
-            sentences.append(f"{side}'s {format_square_noun_list(combined, 'pawn')} are isolated and passed.")
-
-    if len(isolated_only) == 1 and len(passed_only) == 1 and not doubled_files and not combined:
-        return [format_isolated_sentence(side, isolated_only), format_passed_sentence(side, passed_only)]
-
+            clauses.append(f"isolated and passed pawns on {format_square_list(combined)}")
     if isolated_only:
-        sentences.append(format_isolated_sentence(side, isolated_only))
-
-    if doubled_files:
-        clauses = [_doubled_group_clause(file_name, squares) for file_name, squares in doubled_files.items()]
-        if len(clauses) == 1:
-            sentences.append(f"{side} has {clauses[0]}.")
+        if len(isolated_only) == 1:
+            clauses.append(f"an isolated pawn on {isolated_only[0]}")
         else:
-            sentences.append(f"{side} has {join_items(clauses)}.")
-
+            clauses.append(f"isolated pawns on {format_square_list(isolated_only)}")
+    if doubled_files:
+        clauses.extend(
+            _doubled_clause(file_name, squares, set(isolated), set(passed))
+            for file_name, squares in doubled_files.items()
+        )
     if passed_only:
-        sentences.append(format_passed_sentence(side, passed_only))
+        if len(passed_only) == 1:
+            clauses.append(f"a passed pawn on {passed_only[0]}")
+        else:
+            clauses.append(f"passed pawns on {format_square_list(passed_only)}")
 
-    return sentences
+    if not clauses:
+        return None
+    return f"{side} has {'; '.join(clauses)}."
 
 
-def _file_sentences(files: FileFacts) -> list[str]:
+def _file_sentence(files: FileFacts) -> str | None:
+    if not files.open and not files.semi_open.white and not files.semi_open.black:
+        return None
+
     if len(files.open) == 8:
         open_clause = "Every file is open"
     elif files.open:
         open_clause = format_file_open_clause(files.open)
     else:
-        open_clause = "No files are open"
+        open_clause = None
 
     semi_clauses: list[str] = []
     if files.semi_open.white:
-        semi_clauses.append(f"{format_file_list(files.semi_open.white)} are semi-open for White")
+        semi_clauses.append(format_file_semi_open_clause("White", files.semi_open.white))
     if files.semi_open.black:
-        semi_clauses.append(f"{format_file_list(files.semi_open.black)} are semi-open for Black")
+        semi_clauses.append(format_file_semi_open_clause("Black", files.semi_open.black))
 
-    if semi_clauses:
-        return [f"{open_clause}; {'; '.join(semi_clauses)}."]
-    return [f"{open_clause}."]
+    if open_clause and semi_clauses:
+        return f"{open_clause}; {'; '.join(semi_clauses)}."
+    if open_clause:
+        return f"{open_clause}."
+
+    sentence = "; ".join(semi_clauses)
+    return f"{sentence[0].upper()}{sentence[1:]}."
 
 
 def render_factual_explanation(
@@ -110,13 +135,18 @@ def render_factual_explanation(
 
     sentences.append(format_material_sentence(facts.material))
 
-    white_sentences = _side_sentences("White", facts.pawns)
-    black_sentences = _side_sentences("Black", facts.pawns)
-    if white_sentences:
-        sentences.extend(white_sentences)
-    if black_sentences:
-        sentences.extend(black_sentences)
-    if not white_sentences and not black_sentences:
-        sentences.append("Neither side has isolated, doubled, or passed pawns.")
-    sentences.extend(_file_sentences(facts.files))
+    if facts.material.white.pawn == 0 and facts.material.black.pawn == 0:
+        sentences.append("Neither side has pawns.")
+    else:
+        white_sentence = _side_sentence("White", facts.pawns)
+        black_sentence = _side_sentence("Black", facts.pawns)
+        if white_sentence:
+            sentences.append(white_sentence)
+        if black_sentence:
+            sentences.append(black_sentence)
+
+    file_sentence = _file_sentence(facts.files)
+    if file_sentence:
+        sentences.append(file_sentence)
+
     return " ".join(_trim_sentences(sentences))

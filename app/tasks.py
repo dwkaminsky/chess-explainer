@@ -190,7 +190,7 @@ async def complete_task(
     mate_winner: Literal["white", "black"] | None = None,
     mate_moves: int | None = None,
     engine_version: str | None = None,
-    factual_result: dict[str, Any],
+    factual_result: dict[str, Any] | None = None,
 ) -> bool:
     """Persist a successful attempt if its token and lease are still valid."""
 
@@ -200,6 +200,8 @@ async def complete_task(
         raise ValueError("provide exactly one complete ordinary or mate result")
     if mate and (mate_winner not in ("white", "black") or mate_moves is None or mate_moves < 0):
         raise ValueError("mate result requires winner and nonnegative moves")
+    if factual_result is None:
+        raise ValueError("factual_result is required")
     factual_bundle = FactualResult.model_validate(factual_result).model_dump(mode="json")
     if session.in_transaction():
         await session.commit()

@@ -26,8 +26,14 @@ def upgrade() -> None:
         "tasks",
         "status = 'completed' OR factual_result IS NULL",
     )
+    op.create_check_constraint(
+        "ck_tasks_factual_result_json_object",
+        "tasks",
+        "factual_result IS NULL OR jsonb_typeof(factual_result) = 'object'",
+    )
 
 
 def downgrade() -> None:
+    op.drop_constraint("ck_tasks_factual_result_json_object", "tasks", type_="check")
     op.drop_constraint("ck_tasks_factual_result_completed_only", "tasks", type_="check")
     op.drop_column("tasks", "factual_result")

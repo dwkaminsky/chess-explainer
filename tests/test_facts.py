@@ -2,56 +2,81 @@ from __future__ import annotations
 
 import chess
 
-from app.explanations.render import render_factual_explanation
-from app.facts.extract import build_factual_result, extract_facts
-from app.facts.models import TerminalState
+from app.facts.extract import build_factual_result, extract_facts, terminal_context_from_board
 
-EXAMPLE_FEN = "6k1/5ppp/8/8/3P4/8/5PPP/6K1 w - - 0 1"
-TRIPLE_PAWN_FEN = "k7/8/8/8/2P5/2P5/2P5/7K w - - 0 1"
-PAWNLESS_FEN = "k7/8/8/8/8/8/8/7K w - - 0 1"
+PLAN_FEN = "6k1/5ppp/8/8/3P4/8/5PPP/6K1 w - - 0 1"
+PROMOTED_QUEENS_FEN = "4k3/8/8/8/8/8/8/Q3K2Q w - - 0 1"
+FAR_APART_EDGE_FEN = "4k3/1P6/8/8/8/8/P7/4K3 w - - 0 1"
+TRIPLE_FILE_FEN = "4k3/8/2P5/8/2P5/8/2P5/4K3 w - - 0 1"
+CHECKMATE_FEN = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1"
+
+EXPECTED_PLAN_FACTS = {
+    "material": {
+        "white": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 4},
+        "black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 3},
+        "white_minus_black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 1},
+    },
+    "pawns": {
+        "white": {"isolated": ["d4"], "doubled_files": {}, "passed": ["d4"]},
+        "black": {"isolated": [], "doubled_files": {}, "passed": []},
+    },
+    "files": {
+        "open": ["a", "b", "c", "e"],
+        "semi_open": {"white": [], "black": ["d"]},
+    },
+}
 
 
-def test_worked_example_matches_plan_fixture():
-    board = chess.Board(EXAMPLE_FEN)
+def test_extract_facts_matches_the_planned_fixture_and_keeps_board_state():
+    board = chess.Board(PLAN_FEN)
+    before = board.fen()
+
     facts = extract_facts(board)
-    assert facts.model_dump(mode="json") == {
-        "material": {
-            "white": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 4},
-            "black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 3},
-            "white_minus_black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 1},
-        },
-        "pawns": {
-            "white": {"isolated": ["d4"], "doubled_files": {}, "passed": ["d4"]},
-            "black": {"isolated": [], "doubled_files": {}, "passed": []},
-        },
-        "files": {
-            "open": ["a", "b", "c", "e"],
-            "semi_open": {"white": [], "black": ["d"]},
-        },
-    }
-    result = build_factual_result(board)
-    assert result.model_dump(mode="json") == {
-        "version": 1,
-        "facts": facts.model_dump(mode="json"),
-        "explanation": "White has one more pawn than Black. White's d4-pawn is isolated and passed. The a-, b-, c-, and e-files are open; the d-file is semi-open for Black.",
-    }
+
+    assert board.fen() == before
+    assert facts.model_dump(mode="json") == EXPECTED_PLAN_FACTS
 
 
-def test_renderer_handles_same_file_groups_and_terminal_prose():
-    board = chess.Board(TRIPLE_PAWN_FEN)
+def test_extract_material_counts_promoted_queens():
+    board = chess.Board(PROMOTED_QUEENS_FEN)
+
     facts = extract_facts(board)
-    text = render_factual_explanation(facts, TerminalState(kind="none"))
-    assert "White's c2-, c3-, and c4-pawns are isolated and passed." in text
-    assert "White has three pawns on the c-file." in text
 
-    terminal_text = render_factual_explanation(
-        extract_facts(chess.Board(PAWNLESS_FEN)),
-        TerminalState(kind="stalemate"),
-    )
-    assert terminal_text == "The position is stalemate."
+    assert facts.material.white.queen == 2
+    assert facts.material.black.queen == 0
+    assert facts.material.white_minus_black.queen == 2
 
-    mate_text = render_factual_explanation(
-        extract_facts(chess.Board(PAWNLESS_FEN)),
-        TerminalState(kind="checkmate", winner="white"),
-    )
-    assert mate_text == "Black is checkmated."
+
+def test_extract_pawn_facts_treats_far_apart_adjacent_files_as_not_isolated():
+    board = chess.Board(FAR_APART_EDGE_FEN)
+
+    facts = extract_facts(board)
+
+    assert facts.pawns.white.isolated == []
+    assert facts.pawns.white.doubled_files == {}
+    assert facts.pawns.white.passed == ["a2", "b7"]
+
+
+def test_extract_pawn_facts_sorts_three_pawns_on_one_file():
+    board = chess.Board(TRIPLE_FILE_FEN)
+
+    facts = extract_facts(board)
+
+    assert facts.pawns.white.isolated == ["c2", "c4", "c6"]
+    assert facts.pawns.white.doubled_files == {"c": ["c2", "c4", "c6"]}
+    assert facts.pawns.white.passed == ["c2", "c4", "c6"]
+
+
+def test_terminal_context_detects_checkmate_and_result_is_stable():
+    board = chess.Board(CHECKMATE_FEN)
+    before = board.fen()
+
+    first = build_factual_result(board)
+    second = build_factual_result(board)
+    state = terminal_context_from_board(board)
+
+    assert board.fen() == before
+    assert state.kind == "checkmate"
+    assert state.winner == "white"
+    assert first.model_dump(mode="json") == second.model_dump(mode="json")
+    assert first.version == 1

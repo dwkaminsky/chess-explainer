@@ -63,8 +63,31 @@ def make_worker(tasks, evaluator):
 def test_worker_claims_evaluates_and_completes():
     tasks = FakeTasks(SimpleNamespace(id="t1", fen=START, attempts=1, lease_token="l1"))
     worker = make_worker(tasks, lambda fen, config: 34)
-    assert worker.process_once() is True
+    from app import worker as worker_module
+
+    build_calls = 0
+    eval_calls = 0
+    original_build = worker_module.build_factual_result
+
+    def tracked_build(board):
+        nonlocal build_calls
+        build_calls += 1
+        return original_build(board)
+
+    def tracked_eval(fen, config):
+        nonlocal eval_calls
+        eval_calls += 1
+        return 34
+
+    worker.evaluator = tracked_eval
+    worker_module.build_factual_result = tracked_build
+    try:
+        assert worker.process_once() is True
+    finally:
+        worker_module.build_factual_result = original_build
     assert tasks.recovered == 1
+    assert build_calls == 1
+    assert eval_calls == 1
     assert tasks.completed and tasks.completed[0][0:3] == ("t1", "l1", 34)
     assert tasks.completed[0][3]["version"] == 1
     assert tasks.completed[0][3]["facts"]["material"]["white"]["pawn"] == 8
@@ -125,8 +148,15 @@ def test_factual_generation_failure_is_terminal():
     from app import worker as worker_module
 
     original = worker_module.build_factual_result
+    eval_calls = 0
+
+    def tracked_eval(fen, config):
+        nonlocal eval_calls
+        eval_calls += 1
+        return 34
 
     try:
+        worker.evaluator = tracked_eval
         worker_module.build_factual_result = lambda board: (_ for _ in ()).throw(
             worker_module.FactExtractionError("no facts")
         )
@@ -136,3 +166,4 @@ def test_factual_generation_failure_is_terminal():
 
     assert tasks.retried == []
     assert tasks.failed == [("t1", "FACT_EXTRACTION_FAILED")]
+    assert eval_calls == 0

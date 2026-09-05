@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import CheckConstraint
 
-from app.models import TaskStatus
+from app.models import Task, TaskStatus
 from app.tasks import (
     claim_one,
     complete_task,
@@ -33,6 +34,16 @@ FACTUAL_RESULT = {
     },
     "explanation": "White has one more pawn than Black. White's d4-pawn is isolated and passed. The a-, b-, c-, and e-files are open; the d-file is semi-open for Black.",
 }
+
+
+def test_factual_result_schema_checks_are_declared():
+    constraints = {
+        constraint.name
+        for constraint in Task.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert "ck_tasks_factual_result_completed_only" in constraints
+    assert "ck_tasks_factual_result_json_object" in constraints
 
 
 @pytest.mark.asyncio
@@ -78,8 +89,6 @@ async def test_failure_requeues_once_then_is_terminal(db_session):
     await db_session.commit()
     first = await claim_one(db_session)
     assert first is not None and first.lease_token is not None
-    first.factual_result = FACTUAL_RESULT
-    await db_session.commit()
     token = first.lease_token
     assert await fail_or_retry(
         db_session, task.id, token, error_code="ENGINE_TIMEOUT", error_message="timed out"
@@ -141,7 +150,7 @@ async def test_result_shape_validation(db_session):
     claimed = await claim_one(db_session)
     assert claimed is not None and claimed.lease_token is not None
     with pytest.raises(ValueError):
-        await complete_task(db_session, task.id, claimed.lease_token, factual_result=FACTUAL_RESULT)
+        await complete_task(db_session, task.id, claimed.lease_token, evaluation_cp=34)
 
 
 @pytest.mark.asyncio
@@ -150,8 +159,6 @@ async def test_first_expired_lease_requeues_and_preserves_attempt_start(db_sessi
     await db_session.commit()
     first = await claim_one(db_session)
     assert first is not None and first.lease_token is not None
-    first.factual_result = FACTUAL_RESULT
-    await db_session.commit()
     started_at = first.started_at
     first.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=5)
     await db_session.commit()
@@ -172,16 +179,12 @@ async def test_second_expired_lease_is_terminal_failure(db_session):
     await db_session.commit()
     first = await claim_one(db_session)
     assert first is not None
-    first.factual_result = FACTUAL_RESULT
-    await db_session.commit()
     first.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=5)
     await db_session.commit()
     assert await recover_expired(db_session) == 1
 
     second = await claim_one(db_session)
     assert second is not None
-    second.factual_result = FACTUAL_RESULT
-    await db_session.commit()
     second.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=5)
     await db_session.commit()
     assert await recover_expired(db_session) == 1
@@ -191,6 +194,7 @@ async def test_second_expired_lease_is_terminal_failure(db_session):
     assert current.error_code == "LEASE_EXPIRED"
     assert current.finished_at is not None
     assert current.started_at is not None
+    assert current.factual_result is None
 
 
 @pytest.mark.asyncio

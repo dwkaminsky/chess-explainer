@@ -55,8 +55,7 @@ def format_square_list(squares: Sequence[str]) -> str:
 def format_square_noun_list(squares: Sequence[str], noun: str) -> str:
     if len(squares) == 1:
         return f"{squares[0]}-{noun}"
-    parts = [f"{square}-" for square in squares[:-1]] + [f"{squares[-1]}-{noun}s"]
-    return join_items(parts)
+    return join_items([f"{square}-{noun}" for square in squares])
 
 
 def format_file_list(files: Sequence[str]) -> str:
@@ -118,9 +117,11 @@ def format_doubled_sentence(side: str, doubled_files: dict[str, list[str]]) -> s
     clauses: list[str] = []
     for file_name, squares in doubled_files.items():
         if len(squares) == 2:
-            clauses.append(f"doubled pawns on the {file_name}-file")
+            clauses.append(f"doubled pawns on {format_square_list(squares)}")
         else:
-            clauses.append(f"{count_word(len(squares))} pawns on the {file_name}-file")
+            clauses.append(
+                f"{count_word(len(squares))} pawns on the {file_name}-file: {format_square_list(squares)}"
+            )
     return f"{side} has {join_items(clauses)}."
 
 
@@ -136,7 +137,7 @@ def format_terminal_sentence(state: TerminalState) -> str:
     if state.kind == "checkmate":
         return f"{'Black' if state.winner == 'white' else 'White'} is checkmated."
     if state.kind == "stalemate":
-        return "The position is stalemate."
+        return "The game is stalemated."
     if state.kind == "insufficient_material":
         return "The position is drawn by insufficient material."
     if state.kind == "draw":

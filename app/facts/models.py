@@ -11,6 +11,33 @@ FILES = ("a", "b", "c", "d", "e", "f", "g", "h")
 PIECE_ORDER = ("queen", "rook", "bishop", "knight", "pawn")
 SQUARE_RE = r"^[a-h][1-8]$"
 FILE_RE = r"^[a-h]$"
+_FILE_INDEX = {file_name: index for index, file_name in enumerate(FILES)}
+
+
+def _square_sort_key(square: str) -> tuple[int, int]:
+    return _FILE_INDEX[square[0]], int(square[1])
+
+
+def _validate_sorted_unique_squares(value: list[str]) -> list[str]:
+    for item in value:
+        if not isinstance(item, str) or re.fullmatch(SQUARE_RE, item) is None:
+            raise ValueError("square names must be algebraic coordinates")
+    if len(value) != len(set(value)):
+        raise ValueError("square lists must not contain duplicates")
+    if value != sorted(value, key=_square_sort_key):
+        raise ValueError("square lists must be sorted by file then rank")
+    return value
+
+
+def _validate_sorted_unique_files(value: list[str]) -> list[str]:
+    for file_name in value:
+        if re.fullmatch(FILE_RE, file_name) is None:
+            raise ValueError("file names must be in the range a-h")
+    if len(value) != len(set(value)):
+        raise ValueError("file lists must not contain duplicates")
+    if value != sorted(value, key=FILES.index):
+        raise ValueError("file lists must be sorted alphabetically")
+    return value
 
 
 class PieceCounts(BaseModel):
@@ -40,6 +67,17 @@ class MaterialFacts(BaseModel):
     black: PieceCounts
     white_minus_black: PieceDelta
 
+    @model_validator(mode="after")
+    def _validate_deltas(self) -> "MaterialFacts":
+        expected = {
+            piece: getattr(self.white, piece) - getattr(self.black, piece)
+            for piece in PIECE_ORDER
+        }
+        actual = {piece: getattr(self.white_minus_black, piece) for piece in PIECE_ORDER}
+        if actual != expected:
+            raise ValueError("white_minus_black must equal white counts minus black counts")
+        return self
+
 
 class SidePawnFacts(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -51,10 +89,7 @@ class SidePawnFacts(BaseModel):
     @field_validator("isolated", "passed")
     @classmethod
     def _validate_square_list(cls, value: list[str]) -> list[str]:
-        for item in value:
-            if not isinstance(item, str) or re.fullmatch(SQUARE_RE, item) is None:
-                raise ValueError("square names must be algebraic coordinates")
-        return value
+        return _validate_sorted_unique_squares(value)
 
     @field_validator("doubled_files")
     @classmethod
@@ -62,9 +97,14 @@ class SidePawnFacts(BaseModel):
         for file_name, squares in value.items():
             if file_name not in FILES:
                 raise ValueError("pawn files must be in the range a-h")
+            if len(squares) < 2:
+                raise ValueError("doubled file groups must contain at least two pawns")
+            _validate_sorted_unique_squares(squares)
             for square in squares:
-                if not isinstance(square, str) or re.fullmatch(SQUARE_RE, square) is None:
-                    raise ValueError("square names must be algebraic coordinates")
+                if square[0] != file_name:
+                    raise ValueError("doubled file squares must match the mapped file")
+        if list(value) != sorted(value, key=FILES.index):
+            raise ValueError("doubled file groups must be sorted alphabetically")
         return value
 
 
@@ -84,10 +124,13 @@ class SemiOpenFiles(BaseModel):
     @field_validator("white", "black")
     @classmethod
     def _validate_file_list(cls, value: list[str]) -> list[str]:
-        for file_name in value:
-            if re.fullmatch(FILE_RE, file_name) is None:
-                raise ValueError("file names must be in the range a-h")
-        return value
+        return _validate_sorted_unique_files(value)
+
+    @model_validator(mode="after")
+    def _validate_disjoint(self) -> "SemiOpenFiles":
+        if set(self.white) & set(self.black):
+            raise ValueError("a file cannot be semi-open for both sides")
+        return self
 
 
 class FileFacts(BaseModel):
@@ -99,10 +142,15 @@ class FileFacts(BaseModel):
     @field_validator("open")
     @classmethod
     def _validate_open_files(cls, value: list[str]) -> list[str]:
-        for file_name in value:
-            if file_name not in FILES:
-                raise ValueError("file names must be in the range a-h")
-        return value
+        return _validate_sorted_unique_files(value)
+
+    @model_validator(mode="after")
+    def _validate_no_overlap(self) -> "FileFacts":
+        open_files = set(self.open)
+        semi_open_files = set(self.semi_open.white) | set(self.semi_open.black)
+        if open_files & semi_open_files:
+            raise ValueError("open files cannot also be semi-open")
+        return self
 
 
 class PositionFacts(BaseModel):
@@ -133,4 +181,4 @@ class FactualResult(BaseModel):
 
     version: Literal[1]
     facts: PositionFacts
-    explanation: str
+    explanation: str = Field(min_length=1)

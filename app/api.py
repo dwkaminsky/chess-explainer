@@ -176,6 +176,15 @@ def _factual_result(row: Any) -> dict[str, Any] | None:
     }
 
 
+def _serialize_task_response(payload: dict[str, Any]) -> dict[str, Any]:
+    response = TaskResponse.model_validate(payload).model_dump(mode="json")
+    if response.get("mate") is None:
+        response.pop("mate", None)
+    if response.get("error") is None:
+        response.pop("error", None)
+    return response
+
+
 def _task_payload(row: Any) -> dict[str, Any]:
     task_id = _row_value(row, "id", _row_value(row, "task_id"))
     status = _status(row)
@@ -249,8 +258,7 @@ async def poll_task(task_id: UUID, session: Any = Depends(get_session)) -> Respo
     if row is None:
         return JSONResponse(status_code=404, content={"detail": "task not found"})
     try:
-        payload = TaskResponse.model_validate(_task_payload(row))
-        return JSONResponse(content=payload.model_dump(mode="json"))
+        return JSONResponse(content=_serialize_task_response(_task_payload(row)))
     except Exception:
         return JSONResponse(status_code=503, content={"detail": "task result unavailable"})
 

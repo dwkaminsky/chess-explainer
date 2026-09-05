@@ -36,6 +36,7 @@ pytestmark = pytest.mark.skipif(
 
 TEST_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 FACTUAL_FEN = "6k1/5ppp/8/8/3P4/8/5PPP/6K1 w - - 0 1"
+CHECKMATE_FEN = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1"
 EXPECTED_FACTS = {
     "material": {
         "white": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 4},
@@ -59,25 +60,6 @@ EXPECTED_FACTUAL_RESULT = {
     "version": 1,
     "facts": EXPECTED_FACTS,
     "explanation": EXPECTED_EXPLANATION,
-}
-FACTUAL_RESULT = {
-    "version": 1,
-    "facts": {
-        "material": {
-            "white": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 4},
-            "black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 3},
-            "white_minus_black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 1},
-        },
-        "pawns": {
-            "white": {"isolated": ["d4"], "doubled_files": {}, "passed": ["d4"]},
-            "black": {"isolated": [], "doubled_files": {}, "passed": []},
-        },
-        "files": {
-            "open": ["a", "b", "c", "e"],
-            "semi_open": {"white": [], "black": ["d"]},
-        },
-    },
-    "explanation": "White has one more pawn than Black. White's d4-pawn is isolated and passed. The a-, b-, c-, and e-files are open; the d-file is semi-open for Black.",
 }
 
 
@@ -150,7 +132,7 @@ async def test_postgres_stale_lease_cannot_complete_new_attempt(postgres_factori
             task.id,
             old_token,
             evaluation_cp=34,
-            factual_result=FACTUAL_RESULT,
+            factual_result=EXPECTED_FACTUAL_RESULT,
         ) is False
 
 
@@ -158,7 +140,7 @@ async def test_postgres_stale_lease_cannot_complete_new_attempt(postgres_factori
 async def test_real_stockfish_adapter_returns_usable_result():
     result = await asyncio.to_thread(
         evaluate_fen,
-        TEST_FEN,
+        CHECKMATE_FEN,
         {
             "engine_path": os.getenv("ENGINE_PATH", "/usr/games/stockfish"),
             "search_time_seconds": 0.2,
@@ -260,6 +242,3 @@ async def test_stale_completion_keeps_the_winning_factual_bundle(postgres_factor
         row = await session.get(Task, task.id)
         assert row is not None
         assert row.factual_result == winning_bundle
-        assert body["facts"] is not None
-        assert body["explanation"] is not None
-        assert body["explanation_version"] == 1

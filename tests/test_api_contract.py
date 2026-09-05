@@ -182,16 +182,50 @@ def test_completed_score_mate_and_failure_shapes(client, monkeypatch):
             "evaluation_cp": 123,
             "factual_result": FACTUAL_RESULT,
         },
+        UUID("00000000-0000-0000-0000-000000000005"): {
+            "id": UUID("00000000-0000-0000-0000-000000000005"),
+            "status": "completed",
+            "evaluation_cp": 123,
+            "factual_result": {"version": 1, "facts": "bad", "explanation": "still bad"},
+        },
     }
     monkeypatch.setattr(api, "get_task", lambda session, task_id: rows.get(task_id))
     first = client.get("/tasks/00000000-0000-0000-0000-000000000001").json()
-    assert first["evaluation"] == 0.34
-    assert first["facts"] is None and first["explanation"] is None and first["explanation_version"] is None
+    assert first == {
+        "task_id": "00000000-0000-0000-0000-000000000001",
+        "status": "completed",
+        "evaluation": 0.34,
+        "facts": None,
+        "explanation": None,
+        "explanation_version": None,
+    }
     mate = client.get("/tasks/00000000-0000-0000-0000-000000000002").json()
-    assert mate["evaluation"] is None and mate["mate"] == {"winner": "white", "moves": 3}
+    assert mate == {
+        "task_id": "00000000-0000-0000-0000-000000000002",
+        "status": "completed",
+        "evaluation": None,
+        "mate": {"winner": "white", "moves": 3},
+        "facts": FACTUAL_RESULT["facts"],
+        "explanation": FACTUAL_RESULT["explanation"],
+        "explanation_version": 1,
+    }
     failed = client.get("/tasks/00000000-0000-0000-0000-000000000003").json()
-    assert failed["error"]["code"] == "ENGINE_TIMEOUT"
-    assert failed["facts"] is None and failed["explanation"] is None and failed["explanation_version"] is None
+    assert failed == {
+        "task_id": "00000000-0000-0000-0000-000000000003",
+        "status": "failed",
+        "evaluation": None,
+        "facts": None,
+        "explanation": None,
+        "explanation_version": None,
+        "error": {"code": "ENGINE_TIMEOUT", "message": "timed out"},
+    }
     factual = client.get("/tasks/00000000-0000-0000-0000-000000000004").json()
-    assert factual["facts"]["material"]["white"]["pawn"] == 4
-    assert factual["explanation_version"] == 1
+    assert factual == {
+        "task_id": "00000000-0000-0000-0000-000000000004",
+        "status": "completed",
+        "evaluation": 1.23,
+        "facts": FACTUAL_RESULT["facts"],
+        "explanation": FACTUAL_RESULT["explanation"],
+        "explanation_version": 1,
+    }
+    assert client.get("/tasks/00000000-0000-0000-0000-000000000005").status_code == 503

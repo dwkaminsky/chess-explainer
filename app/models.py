@@ -104,6 +104,10 @@ class Task(Base):
             "status = 'completed' OR factual_result IS NULL",
             name="ck_tasks_factual_result_completed_only",
         ),
+        CheckConstraint(
+            "factual_result IS NULL OR json_type(factual_result) = 'object'",
+            name="ck_tasks_factual_result_json_object",
+        ),
         # PostgreSQL uses these predicates to keep the queue indexes small.  The
         # predicates are portable enough for SQLite's test schema as well.
         Index(
