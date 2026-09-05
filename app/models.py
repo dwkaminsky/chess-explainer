@@ -49,6 +49,9 @@ class Task(Base):
     factual_result: Mapped[dict[str, Any] | None] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
+    candidate_result: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
     evaluation_config: Mapped[dict[str, Any]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=False
     )
@@ -107,6 +110,14 @@ class Task(Base):
         CheckConstraint(
             "factual_result IS NULL OR json_type(factual_result) = 'object'",
             name="ck_tasks_factual_result_json_object",
+        ),
+        CheckConstraint(
+            "status = 'completed' OR candidate_result IS NULL",
+            name="ck_tasks_candidate_result_completed_only",
+        ),
+        CheckConstraint(
+            "candidate_result IS NULL OR json_type(candidate_result) = 'object'",
+            name="ck_tasks_candidate_result_json_object",
         ),
         # PostgreSQL uses these predicates to keep the queue indexes small.  The
         # predicates are portable enough for SQLite's test schema as well.

@@ -1,0 +1,1277 @@
+{
+  "candidate_result": {
+    "version": 1,
+    "analysis": {
+      "facts_version": 1,
+      "root_side": "white",
+      "requested_count": 3,
+      "returned_count": 3,
+      "snapshot_depth": 10,
+      "search_budget_ms": 3000,
+      "max_continuation_plies": 6,
+      "selection_policy": "last_complete_depth"
+    },
+    "moves": [
+      {
+        "rank": 1,
+        "move": {
+          "uci": "e4d5",
+          "san": "exd5"
+        },
+        "evaluation": 0.34,
+        "mate": null,
+        "gap_to_best": 0.0,
+        "continuation": [
+          {
+            "ply": 1,
+            "side": "white",
+            "move_number": 2,
+            "uci": "e4d5",
+            "san": "exd5",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+            "mover": {
+              "id": "wP:e4",
+              "color": "white",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "e4",
+              "to": "d5"
+            },
+            "capture": {
+              "id": "bP:d5",
+              "color": "black",
+              "type": "pawn",
+              "square": "d5"
+            },
+            "promotion": null,
+            "rook_move": null,
+            "changes": [
+              {
+                "id": "e4d5:1:material",
+                "kind": "material_changed",
+                "delta": {
+                  "white": {},
+                  "black": {
+                    "pawn": -1
+                  }
+                }
+              },
+              {
+                "id": "e4d5:1:group:white:d",
+                "kind": "pawn_group_changed",
+                "side": "white",
+                "file": "d",
+                "before": [],
+                "after": [
+                  {
+                    "id": "wP:d2",
+                    "square": "d2"
+                  },
+                  {
+                    "id": "wP:e4",
+                    "square": "d5"
+                  }
+                ]
+              },
+              {
+                "id": "e4d5:1:file:d",
+                "kind": "file_status_changed",
+                "file": "d",
+                "before": "closed",
+                "after": "semi_open_black"
+              },
+              {
+                "id": "e4d5:1:file:e",
+                "kind": "file_status_changed",
+                "file": "e",
+                "before": "closed",
+                "after": "semi_open_white"
+              }
+            ]
+          },
+          {
+            "ply": 2,
+            "side": "black",
+            "move_number": 2,
+            "uci": "d8d5",
+            "san": "Qxd5",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+            "fen_after": "rnb1kbnr/ppp1pppp/8/3q4/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+            "mover": {
+              "id": "bQ:d8",
+              "color": "black",
+              "type_before": "queen",
+              "type_after": "queen",
+              "from": "d8",
+              "to": "d5"
+            },
+            "capture": {
+              "id": "wP:e4",
+              "color": "white",
+              "type": "pawn",
+              "square": "d5"
+            },
+            "promotion": null,
+            "rook_move": null,
+            "changes": [
+              {
+                "id": "e4d5:2:material",
+                "kind": "material_changed",
+                "delta": {
+                  "white": {
+                    "pawn": -1
+                  },
+                  "black": {}
+                }
+              },
+              {
+                "id": "e4d5:2:group:white:d",
+                "kind": "pawn_group_changed",
+                "side": "white",
+                "file": "d",
+                "before": [
+                  {
+                    "id": "wP:d2",
+                    "square": "d2"
+                  },
+                  {
+                    "id": "wP:e4",
+                    "square": "d5"
+                  }
+                ],
+                "after": []
+              }
+            ]
+          },
+          {
+            "ply": 3,
+            "side": "white",
+            "move_number": 3,
+            "uci": "b1c3",
+            "san": "Nc3",
+            "fen_before": "rnb1kbnr/ppp1pppp/8/3q4/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+            "fen_after": "rnb1kbnr/ppp1pppp/8/3q4/8/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 3",
+            "mover": {
+              "id": "wN:b1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "b1",
+              "to": "c3"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 4,
+            "side": "black",
+            "move_number": 3,
+            "uci": "d5d8",
+            "san": "Qd8",
+            "fen_before": "rnb1kbnr/ppp1pppp/8/3q4/8/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 3",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/8/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 2 4",
+            "mover": {
+              "id": "bQ:d8",
+              "color": "black",
+              "type_before": "queen",
+              "type_after": "queen",
+              "from": "d5",
+              "to": "d8"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 5,
+            "side": "white",
+            "move_number": 4,
+            "uci": "d2d4",
+            "san": "d4",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/8/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 2 4",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/8/3P4/2N5/PPP2PPP/R1BQKBNR b KQkq d3 0 4",
+            "mover": {
+              "id": "wP:d2",
+              "color": "white",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "d2",
+              "to": "d4"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 6,
+            "side": "black",
+            "move_number": 4,
+            "uci": "g8f6",
+            "san": "Nf6",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/8/3P4/2N5/PPP2PPP/R1BQKBNR b KQkq d3 0 4",
+            "fen_after": "rnbqkb1r/ppp1pppp/5n2/8/3P4/2N5/PPP2PPP/R1BQKBNR w KQkq - 1 5",
+            "mover": {
+              "id": "bN:g8",
+              "color": "black",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "g8",
+              "to": "f6"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          }
+        ],
+        "continuation_end": "engine_line_end",
+        "material_delta": {
+          "white": {
+            "pawn": -1
+          },
+          "black": {
+            "pawn": -1
+          }
+        },
+        "description": "exd5 captures Black's d5-pawn and makes the e-file semi-open for White. In the displayed continuation, 2...Qxd5 captures White's pawn on d5, restoring equal pawn counts.",
+        "description_sources": [
+          {
+            "sentence_index": 0,
+            "plies": [
+              1
+            ],
+            "change_ids": [
+              "e4d5:1:material",
+              "e4d5:1:file:e"
+            ]
+          },
+          {
+            "sentence_index": 1,
+            "plies": [
+              2
+            ],
+            "change_ids": [
+              "e4d5:2:material"
+            ]
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "move": {
+          "uci": "e4e5",
+          "san": "e5"
+        },
+        "evaluation": 0.1,
+        "mate": null,
+        "gap_to_best": 0.24,
+        "continuation": [
+          {
+            "ply": 1,
+            "side": "white",
+            "move_number": 2,
+            "uci": "e4e5",
+            "san": "e5",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+            "mover": {
+              "id": "wP:e4",
+              "color": "white",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "e4",
+              "to": "e5"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 2,
+            "side": "black",
+            "move_number": 2,
+            "uci": "d5d4",
+            "san": "d4",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/4P3/3p4/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+            "mover": {
+              "id": "bP:d5",
+              "color": "black",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "d5",
+              "to": "d4"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 3,
+            "side": "white",
+            "move_number": 3,
+            "uci": "g1f3",
+            "san": "Nf3",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/4P3/3p4/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/4P3/3p4/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 3",
+            "mover": {
+              "id": "wN:g1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "g1",
+              "to": "f3"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 4,
+            "side": "black",
+            "move_number": 3,
+            "uci": "b8c6",
+            "san": "Nc6",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/4P3/3p4/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 3",
+            "fen_after": "r1bqkbnr/ppp1pppp/2n5/4P3/3p4/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 4",
+            "mover": {
+              "id": "bN:b8",
+              "color": "black",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "b8",
+              "to": "c6"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 5,
+            "side": "white",
+            "move_number": 4,
+            "uci": "f1b5",
+            "san": "Bb5",
+            "fen_before": "r1bqkbnr/ppp1pppp/2n5/4P3/3p4/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 4",
+            "fen_after": "r1bqkbnr/ppp1pppp/2n5/1B2P3/3p4/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 4",
+            "mover": {
+              "id": "wB:f1",
+              "color": "white",
+              "type_before": "bishop",
+              "type_after": "bishop",
+              "from": "f1",
+              "to": "b5"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 6,
+            "side": "black",
+            "move_number": 4,
+            "uci": "g8f6",
+            "san": "Nf6",
+            "fen_before": "r1bqkbnr/ppp1pppp/2n5/1B2P3/3p4/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 4",
+            "fen_after": "r1bqkb1r/ppp1pppp/2n2n2/1B2P3/3p4/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 5",
+            "mover": {
+              "id": "bN:g8",
+              "color": "black",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "g8",
+              "to": "f6"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          }
+        ],
+        "continuation_end": "engine_line_end",
+        "material_delta": {
+          "white": {},
+          "black": {}
+        },
+        "description": "e5 moves White's pawn from e4 to e5.",
+        "description_sources": [
+          {
+            "sentence_index": 0,
+            "plies": [
+              1
+            ],
+            "change_ids": []
+          }
+        ]
+      },
+      {
+        "rank": 3,
+        "move": {
+          "uci": "b1c3",
+          "san": "Nc3"
+        },
+        "evaluation": -0.08,
+        "mate": null,
+        "gap_to_best": 0.42,
+        "continuation": [
+          {
+            "ply": 1,
+            "side": "white",
+            "move_number": 2,
+            "uci": "b1c3",
+            "san": "Nc3",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/3p4/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2",
+            "mover": {
+              "id": "wN:b1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "b1",
+              "to": "c3"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 2,
+            "side": "black",
+            "move_number": 2,
+            "uci": "d5d4",
+            "san": "d4",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3p4/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/8/3pP3/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 3",
+            "mover": {
+              "id": "bP:d5",
+              "color": "black",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "d5",
+              "to": "d4"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 3,
+            "side": "white",
+            "move_number": 3,
+            "uci": "c3e2",
+            "san": "Nce2",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/8/3pP3/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 3",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPPPNPPP/R1BQKBNR b KQkq - 1 3",
+            "mover": {
+              "id": "wN:b1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "c3",
+              "to": "e2"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 4,
+            "side": "black",
+            "move_number": 3,
+            "uci": "e7e5",
+            "san": "e5",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPPPNPPP/R1BQKBNR b KQkq - 1 3",
+            "fen_after": "rnbqkbnr/ppp2ppp/8/4p3/3pP3/8/PPPPNPPP/R1BQKBNR w KQkq e6 0 4",
+            "mover": {
+              "id": "bP:e7",
+              "color": "black",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "e7",
+              "to": "e5"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 5,
+            "side": "white",
+            "move_number": 4,
+            "uci": "g1f3",
+            "san": "Nf3",
+            "fen_before": "rnbqkbnr/ppp2ppp/8/4p3/3pP3/8/PPPPNPPP/R1BQKBNR w KQkq e6 0 4",
+            "fen_after": "rnbqkbnr/ppp2ppp/8/4p3/3pP3/5N2/PPPPNPPP/R1BQKB1R b KQkq - 1 4",
+            "mover": {
+              "id": "wN:g1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "g1",
+              "to": "f3"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 6,
+            "side": "black",
+            "move_number": 4,
+            "uci": "b8c6",
+            "san": "Nc6",
+            "fen_before": "rnbqkbnr/ppp2ppp/8/4p3/3pP3/5N2/PPPPNPPP/R1BQKB1R b KQkq - 1 4",
+            "fen_after": "r1bqkbnr/ppp2ppp/2n5/4p3/3pP3/5N2/PPPPNPPP/R1BQKB1R w KQkq - 2 5",
+            "mover": {
+              "id": "bN:b8",
+              "color": "black",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "b8",
+              "to": "c6"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          }
+        ],
+        "continuation_end": "engine_line_end",
+        "material_delta": {
+          "white": {},
+          "black": {}
+        },
+        "description": "Nc3 moves White's knight from b1 to c3.",
+        "description_sources": [
+          {
+            "sentence_index": 0,
+            "plies": [
+              1
+            ],
+            "change_ids": []
+          }
+        ]
+      }
+    ],
+    "provenance": {
+      "normalized_fen": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+      "engine_build": "stockfish-test",
+      "network_hash": null,
+      "options": {
+        "Threads": 1,
+        "Hash": 64,
+        "MultiPV": 3
+      },
+      "selected_depth": 10,
+      "raw_scores": [
+        {
+          "kind": "cp",
+          "value": 34
+        },
+        {
+          "kind": "cp",
+          "value": 10
+        },
+        {
+          "kind": "cp",
+          "value": -8
+        }
+      ],
+      "original_pv_lengths": [
+        6,
+        6,
+        6
+      ],
+      "elapsed_attempt_ms": 1,
+      "elapsed_search_ms": 1,
+      "elapsed_replay_ms": 0,
+      "elapsed_render_ms": 0,
+      "incomplete_groups": 0,
+      "bound_only_groups": 0,
+      "duplicate_root_groups": 0,
+      "inconsistent_groups": 0
+    }
+  },
+  "factual_result": {
+    "version": 1,
+    "facts": {
+      "material": {
+        "white": {
+          "queen": 1,
+          "rook": 2,
+          "bishop": 2,
+          "knight": 2,
+          "pawn": 8
+        },
+        "black": {
+          "queen": 1,
+          "rook": 2,
+          "bishop": 2,
+          "knight": 2,
+          "pawn": 8
+        },
+        "white_minus_black": {
+          "queen": 0,
+          "rook": 0,
+          "bishop": 0,
+          "knight": 0,
+          "pawn": 0
+        }
+      },
+      "pawns": {
+        "white": {
+          "isolated": [],
+          "doubled_files": {},
+          "passed": []
+        },
+        "black": {
+          "isolated": [],
+          "doubled_files": {},
+          "passed": []
+        }
+      },
+      "files": {
+        "open": [],
+        "semi_open": {
+          "white": [],
+          "black": []
+        }
+      }
+    },
+    "explanation": "Both sides have the same material. Neither side has isolated, doubled, or passed pawns."
+  },
+  "public_response": {
+    "task_id": "00000000-0000-0000-0000-000000000008",
+    "status": "completed",
+    "evaluation": 0.34,
+    "facts": {
+      "material": {
+        "white": {
+          "queen": 1,
+          "rook": 2,
+          "bishop": 2,
+          "knight": 2,
+          "pawn": 8
+        },
+        "black": {
+          "queen": 1,
+          "rook": 2,
+          "bishop": 2,
+          "knight": 2,
+          "pawn": 8
+        },
+        "white_minus_black": {
+          "queen": 0,
+          "rook": 0,
+          "bishop": 0,
+          "knight": 0,
+          "pawn": 0
+        }
+      },
+      "pawns": {
+        "white": {
+          "isolated": [],
+          "doubled_files": {},
+          "passed": []
+        },
+        "black": {
+          "isolated": [],
+          "doubled_files": {},
+          "passed": []
+        }
+      },
+      "files": {
+        "open": [],
+        "semi_open": {
+          "white": [],
+          "black": []
+        }
+      }
+    },
+    "explanation": "Both sides have the same material. Neither side has isolated, doubled, or passed pawns.",
+    "explanation_version": 1,
+    "candidate_moves": [
+      {
+        "rank": 1,
+        "move": {
+          "uci": "e4d5",
+          "san": "exd5"
+        },
+        "evaluation": 0.34,
+        "mate": null,
+        "gap_to_best": 0.0,
+        "continuation": [
+          {
+            "ply": 1,
+            "side": "white",
+            "move_number": 2,
+            "uci": "e4d5",
+            "san": "exd5",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+            "mover": {
+              "id": "wP:e4",
+              "color": "white",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "e4",
+              "to": "d5"
+            },
+            "capture": {
+              "id": "bP:d5",
+              "color": "black",
+              "type": "pawn",
+              "square": "d5"
+            },
+            "promotion": null,
+            "rook_move": null,
+            "changes": [
+              {
+                "id": "e4d5:1:material",
+                "kind": "material_changed",
+                "delta": {
+                  "white": {},
+                  "black": {
+                    "pawn": -1
+                  }
+                }
+              },
+              {
+                "id": "e4d5:1:group:white:d",
+                "kind": "pawn_group_changed",
+                "side": "white",
+                "file": "d",
+                "before": [],
+                "after": [
+                  {
+                    "id": "wP:d2",
+                    "square": "d2"
+                  },
+                  {
+                    "id": "wP:e4",
+                    "square": "d5"
+                  }
+                ]
+              },
+              {
+                "id": "e4d5:1:file:d",
+                "kind": "file_status_changed",
+                "file": "d",
+                "before": "closed",
+                "after": "semi_open_black"
+              },
+              {
+                "id": "e4d5:1:file:e",
+                "kind": "file_status_changed",
+                "file": "e",
+                "before": "closed",
+                "after": "semi_open_white"
+              }
+            ]
+          },
+          {
+            "ply": 2,
+            "side": "black",
+            "move_number": 2,
+            "uci": "d8d5",
+            "san": "Qxd5",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3P4/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+            "fen_after": "rnb1kbnr/ppp1pppp/8/3q4/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+            "mover": {
+              "id": "bQ:d8",
+              "color": "black",
+              "type_before": "queen",
+              "type_after": "queen",
+              "from": "d8",
+              "to": "d5"
+            },
+            "capture": {
+              "id": "wP:e4",
+              "color": "white",
+              "type": "pawn",
+              "square": "d5"
+            },
+            "promotion": null,
+            "rook_move": null,
+            "changes": [
+              {
+                "id": "e4d5:2:material",
+                "kind": "material_changed",
+                "delta": {
+                  "white": {
+                    "pawn": -1
+                  },
+                  "black": {}
+                }
+              },
+              {
+                "id": "e4d5:2:group:white:d",
+                "kind": "pawn_group_changed",
+                "side": "white",
+                "file": "d",
+                "before": [
+                  {
+                    "id": "wP:d2",
+                    "square": "d2"
+                  },
+                  {
+                    "id": "wP:e4",
+                    "square": "d5"
+                  }
+                ],
+                "after": []
+              }
+            ]
+          },
+          {
+            "ply": 3,
+            "side": "white",
+            "move_number": 3,
+            "uci": "b1c3",
+            "san": "Nc3",
+            "fen_before": "rnb1kbnr/ppp1pppp/8/3q4/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+            "fen_after": "rnb1kbnr/ppp1pppp/8/3q4/8/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 3",
+            "mover": {
+              "id": "wN:b1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "b1",
+              "to": "c3"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 4,
+            "side": "black",
+            "move_number": 3,
+            "uci": "d5d8",
+            "san": "Qd8",
+            "fen_before": "rnb1kbnr/ppp1pppp/8/3q4/8/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 3",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/8/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 2 4",
+            "mover": {
+              "id": "bQ:d8",
+              "color": "black",
+              "type_before": "queen",
+              "type_after": "queen",
+              "from": "d5",
+              "to": "d8"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 5,
+            "side": "white",
+            "move_number": 4,
+            "uci": "d2d4",
+            "san": "d4",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/8/8/2N5/PPPP1PPP/R1BQKBNR w KQkq - 2 4",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/8/3P4/2N5/PPP2PPP/R1BQKBNR b KQkq d3 0 4",
+            "mover": {
+              "id": "wP:d2",
+              "color": "white",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "d2",
+              "to": "d4"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 6,
+            "side": "black",
+            "move_number": 4,
+            "uci": "g8f6",
+            "san": "Nf6",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/8/3P4/2N5/PPP2PPP/R1BQKBNR b KQkq d3 0 4",
+            "fen_after": "rnbqkb1r/ppp1pppp/5n2/8/3P4/2N5/PPP2PPP/R1BQKBNR w KQkq - 1 5",
+            "mover": {
+              "id": "bN:g8",
+              "color": "black",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "g8",
+              "to": "f6"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          }
+        ],
+        "continuation_end": "engine_line_end",
+        "material_delta": {
+          "white": {
+            "pawn": -1
+          },
+          "black": {
+            "pawn": -1
+          }
+        },
+        "description": "exd5 captures Black's d5-pawn and makes the e-file semi-open for White. In the displayed continuation, 2...Qxd5 captures White's pawn on d5, restoring equal pawn counts.",
+        "description_sources": [
+          {
+            "sentence_index": 0,
+            "plies": [
+              1
+            ],
+            "change_ids": [
+              "e4d5:1:material",
+              "e4d5:1:file:e"
+            ]
+          },
+          {
+            "sentence_index": 1,
+            "plies": [
+              2
+            ],
+            "change_ids": [
+              "e4d5:2:material"
+            ]
+          }
+        ]
+      },
+      {
+        "rank": 2,
+        "move": {
+          "uci": "e4e5",
+          "san": "e5"
+        },
+        "evaluation": 0.1,
+        "mate": null,
+        "gap_to_best": 0.24,
+        "continuation": [
+          {
+            "ply": 1,
+            "side": "white",
+            "move_number": 2,
+            "uci": "e4e5",
+            "san": "e5",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+            "mover": {
+              "id": "wP:e4",
+              "color": "white",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "e4",
+              "to": "e5"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 2,
+            "side": "black",
+            "move_number": 2,
+            "uci": "d5d4",
+            "san": "d4",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/4P3/3p4/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+            "mover": {
+              "id": "bP:d5",
+              "color": "black",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "d5",
+              "to": "d4"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 3,
+            "side": "white",
+            "move_number": 3,
+            "uci": "g1f3",
+            "san": "Nf3",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/4P3/3p4/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/4P3/3p4/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 3",
+            "mover": {
+              "id": "wN:g1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "g1",
+              "to": "f3"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 4,
+            "side": "black",
+            "move_number": 3,
+            "uci": "b8c6",
+            "san": "Nc6",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/4P3/3p4/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 3",
+            "fen_after": "r1bqkbnr/ppp1pppp/2n5/4P3/3p4/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 4",
+            "mover": {
+              "id": "bN:b8",
+              "color": "black",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "b8",
+              "to": "c6"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 5,
+            "side": "white",
+            "move_number": 4,
+            "uci": "f1b5",
+            "san": "Bb5",
+            "fen_before": "r1bqkbnr/ppp1pppp/2n5/4P3/3p4/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 4",
+            "fen_after": "r1bqkbnr/ppp1pppp/2n5/1B2P3/3p4/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 4",
+            "mover": {
+              "id": "wB:f1",
+              "color": "white",
+              "type_before": "bishop",
+              "type_after": "bishop",
+              "from": "f1",
+              "to": "b5"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 6,
+            "side": "black",
+            "move_number": 4,
+            "uci": "g8f6",
+            "san": "Nf6",
+            "fen_before": "r1bqkbnr/ppp1pppp/2n5/1B2P3/3p4/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 4",
+            "fen_after": "r1bqkb1r/ppp1pppp/2n2n2/1B2P3/3p4/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 5",
+            "mover": {
+              "id": "bN:g8",
+              "color": "black",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "g8",
+              "to": "f6"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          }
+        ],
+        "continuation_end": "engine_line_end",
+        "material_delta": {
+          "white": {},
+          "black": {}
+        },
+        "description": "e5 moves White's pawn from e4 to e5.",
+        "description_sources": [
+          {
+            "sentence_index": 0,
+            "plies": [
+              1
+            ],
+            "change_ids": []
+          }
+        ]
+      },
+      {
+        "rank": 3,
+        "move": {
+          "uci": "b1c3",
+          "san": "Nc3"
+        },
+        "evaluation": -0.08,
+        "mate": null,
+        "gap_to_best": 0.42,
+        "continuation": [
+          {
+            "ply": 1,
+            "side": "white",
+            "move_number": 2,
+            "uci": "b1c3",
+            "san": "Nc3",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/3p4/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2",
+            "mover": {
+              "id": "wN:b1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "b1",
+              "to": "c3"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 2,
+            "side": "black",
+            "move_number": 2,
+            "uci": "d5d4",
+            "san": "d4",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/3p4/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/8/3pP3/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 3",
+            "mover": {
+              "id": "bP:d5",
+              "color": "black",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "d5",
+              "to": "d4"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 3,
+            "side": "white",
+            "move_number": 3,
+            "uci": "c3e2",
+            "san": "Nce2",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/8/3pP3/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 3",
+            "fen_after": "rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPPPNPPP/R1BQKBNR b KQkq - 1 3",
+            "mover": {
+              "id": "wN:b1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "c3",
+              "to": "e2"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 4,
+            "side": "black",
+            "move_number": 3,
+            "uci": "e7e5",
+            "san": "e5",
+            "fen_before": "rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPPPNPPP/R1BQKBNR b KQkq - 1 3",
+            "fen_after": "rnbqkbnr/ppp2ppp/8/4p3/3pP3/8/PPPPNPPP/R1BQKBNR w KQkq e6 0 4",
+            "mover": {
+              "id": "bP:e7",
+              "color": "black",
+              "type_before": "pawn",
+              "type_after": "pawn",
+              "from": "e7",
+              "to": "e5"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 5,
+            "side": "white",
+            "move_number": 4,
+            "uci": "g1f3",
+            "san": "Nf3",
+            "fen_before": "rnbqkbnr/ppp2ppp/8/4p3/3pP3/8/PPPPNPPP/R1BQKBNR w KQkq e6 0 4",
+            "fen_after": "rnbqkbnr/ppp2ppp/8/4p3/3pP3/5N2/PPPPNPPP/R1BQKB1R b KQkq - 1 4",
+            "mover": {
+              "id": "wN:g1",
+              "color": "white",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "g1",
+              "to": "f3"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          },
+          {
+            "ply": 6,
+            "side": "black",
+            "move_number": 4,
+            "uci": "b8c6",
+            "san": "Nc6",
+            "fen_before": "rnbqkbnr/ppp2ppp/8/4p3/3pP3/5N2/PPPPNPPP/R1BQKB1R b KQkq - 1 4",
+            "fen_after": "r1bqkbnr/ppp2ppp/2n5/4p3/3pP3/5N2/PPPPNPPP/R1BQKB1R w KQkq - 2 5",
+            "mover": {
+              "id": "bN:b8",
+              "color": "black",
+              "type_before": "knight",
+              "type_after": "knight",
+              "from": "b8",
+              "to": "c6"
+            },
+            "capture": null,
+            "promotion": null,
+            "rook_move": null,
+            "changes": []
+          }
+        ],
+        "continuation_end": "engine_line_end",
+        "material_delta": {
+          "white": {},
+          "black": {}
+        },
+        "description": "Nc3 moves White's knight from b1 to c3.",
+        "description_sources": [
+          {
+            "sentence_index": 0,
+            "plies": [
+              1
+            ],
+            "change_ids": []
+          }
+        ]
+      }
+    ],
+    "candidate_analysis": {
+      "version": 1,
+      "facts_version": 1,
+      "root_side": "white",
+      "requested_count": 3,
+      "returned_count": 3,
+      "snapshot_depth": 10,
+      "search_budget_ms": 3000,
+      "max_continuation_plies": 6,
+      "selection_policy": "last_complete_depth"
+    }
+  }
+}

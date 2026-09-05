@@ -36,6 +36,40 @@ FACTUAL_RESULT = {
 }
 
 
+def candidate_result(fen: str = "valid fen") -> dict[str, object]:
+    return {
+        "version": 1,
+        "analysis": {
+            "facts_version": 1,
+            "root_side": "white",
+            "requested_count": 1,
+            "returned_count": 0,
+            "snapshot_depth": None,
+            "search_budget_ms": 1,
+            "max_continuation_plies": 6,
+            "selection_policy": "terminal_position",
+        },
+        "moves": [],
+        "provenance": {
+            "normalized_fen": fen,
+            "engine_build": "stockfish-15.1-4",
+            "network_hash": None,
+            "options": {},
+            "selected_depth": None,
+            "raw_scores": [],
+            "original_pv_lengths": [],
+            "elapsed_attempt_ms": 0,
+            "elapsed_search_ms": 0,
+            "elapsed_replay_ms": 0,
+            "elapsed_render_ms": 0,
+            "incomplete_groups": 0,
+            "bound_only_groups": 0,
+            "duplicate_root_groups": 0,
+            "inconsistent_groups": 0,
+        },
+    }
+
+
 def test_factual_result_schema_checks_are_declared():
     constraints = {
         constraint.name
@@ -44,6 +78,8 @@ def test_factual_result_schema_checks_are_declared():
     }
     assert "ck_tasks_factual_result_completed_only" in constraints
     assert "ck_tasks_factual_result_json_object" in constraints
+    assert "ck_tasks_candidate_result_completed_only" in constraints
+    assert "ck_tasks_candidate_result_json_object" in constraints
 
 
 @pytest.mark.asyncio
@@ -59,6 +95,7 @@ async def test_create_and_claim_are_durable_state_transitions(db_session):
     assert claimed.lease_token is not None
     assert claimed.lease_expires_at is not None
     assert claimed.factual_result is None
+    assert claimed.candidate_result is None
 
 
 @pytest.mark.asyncio
@@ -78,6 +115,7 @@ async def test_stale_completion_is_rejected(db_session):
         claimed.lease_token,
         evaluation_cp=34,
         factual_result=FACTUAL_RESULT,
+        candidate_result=candidate_result(),
     ) is False
     current = await get_task(db_session, task.id)
     assert current is not None and current.status == TaskStatus.RUNNING.value
@@ -110,6 +148,7 @@ async def test_failure_requeues_once_then_is_terminal(db_session):
     assert current.error_code == "ENGINE_TIMEOUT"
     assert current.lease_token is None
     assert current.factual_result is None
+    assert current.candidate_result is None
 
 
 @pytest.mark.asyncio
@@ -120,12 +159,18 @@ async def test_complete_supports_ordinary_and_mate_results(db_session):
     first = await claim_one(db_session)
     assert first is not None and first.lease_token is not None
     assert await complete_task(
-        db_session, ordinary.id, first.lease_token, evaluation_cp=0, factual_result=FACTUAL_RESULT
+        db_session,
+        ordinary.id,
+        first.lease_token,
+        evaluation_cp=0,
+        factual_result=FACTUAL_RESULT,
+        candidate_result=candidate_result("fen one"),
     ) is True
     current = await get_task(db_session, ordinary.id)
     assert current is not None
     assert current.evaluation_cp == 0
     assert current.factual_result == FACTUAL_RESULT
+    assert current.candidate_result == candidate_result("fen one")
 
     mate = await create_task(db_session, "fen two", {})
     await db_session.commit()
@@ -138,9 +183,11 @@ async def test_complete_supports_ordinary_and_mate_results(db_session):
         mate_winner="black",
         mate_moves=3,
         factual_result=FACTUAL_RESULT,
+        candidate_result=candidate_result("fen two"),
     ) is True
     result = await get_task(db_session, mate.id)
     assert result is not None and result.mate_winner == "black" and result.mate_moves == 3
+    assert result.candidate_result == candidate_result("fen two")
 
 
 @pytest.mark.asyncio
@@ -151,6 +198,23 @@ async def test_result_shape_validation(db_session):
     assert claimed is not None and claimed.lease_token is not None
     with pytest.raises(ValueError):
         await complete_task(db_session, task.id, claimed.lease_token, evaluation_cp=34)
+
+
+@pytest.mark.asyncio
+async def test_candidate_result_validation(db_session):
+    task = await create_task(db_session, "valid fen", {})
+    await db_session.commit()
+    claimed = await claim_one(db_session)
+    assert claimed is not None and claimed.lease_token is not None
+    with pytest.raises(ValueError):
+        await complete_task(
+            db_session,
+            task.id,
+            claimed.lease_token,
+            evaluation_cp=34,
+            factual_result=FACTUAL_RESULT,
+            candidate_result={"version": 1, "analysis": {}, "moves": [], "provenance": {}},
+        )
 
 
 @pytest.mark.asyncio
@@ -171,6 +235,7 @@ async def test_first_expired_lease_requeues_and_preserves_attempt_start(db_sessi
     assert current.started_at == started_at
     assert current.lease_token is None
     assert current.factual_result is None
+    assert current.candidate_result is None
 
 
 @pytest.mark.asyncio
@@ -195,6 +260,7 @@ async def test_second_expired_lease_is_terminal_failure(db_session):
     assert current.finished_at is not None
     assert current.started_at is not None
     assert current.factual_result is None
+    assert current.candidate_result is None
 
 
 @pytest.mark.asyncio
@@ -216,6 +282,7 @@ async def test_old_token_rejected_after_expiry_recovery_and_new_claim(db_session
         old_token,
         evaluation_cp=34,
         factual_result=FACTUAL_RESULT,
+        candidate_result=candidate_result("valid fen"),
     ) is False
     current = await get_task(db_session, task.id)
     assert current is not None and current.status == TaskStatus.RUNNING.value

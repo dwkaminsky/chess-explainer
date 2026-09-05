@@ -25,6 +25,7 @@ from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse, Response
 
 from .config import get_settings
+from .candidates import CandidateResult
 from .facts.models import FactualResult
 from .db import get_session
 from .schemas import TaskCreate, TaskResponse, TaskStatus
@@ -176,8 +177,23 @@ def _factual_result(row: Any) -> dict[str, Any] | None:
     }
 
 
+def _candidate_result(row: Any) -> dict[str, Any] | None:
+    value = _row_value(row, "candidate_result")
+    if value is None:
+        return None
+    bundle = CandidateResult.model_validate(value)
+    analysis = bundle.analysis.model_dump(mode="json")
+    return {
+        "candidate_moves": [move.model_dump(mode="json", by_alias=True) for move in bundle.moves],
+        "candidate_analysis": {
+            "version": bundle.version,
+            **analysis,
+        },
+    }
+
+
 def _serialize_task_response(payload: dict[str, Any]) -> dict[str, Any]:
-    response = TaskResponse.model_validate(payload).model_dump(mode="json")
+    response = TaskResponse.model_validate(payload).model_dump(mode="json", by_alias=True)
     if response.get("mate") is None:
         response.pop("mate", None)
     if response.get("error") is None:
@@ -195,6 +211,8 @@ def _task_payload(row: Any) -> dict[str, Any]:
         "facts": None,
         "explanation": None,
         "explanation_version": None,
+        "candidate_moves": None,
+        "candidate_analysis": None,
     }
 
     if status == TaskStatus.COMPLETED.value:
@@ -215,6 +233,9 @@ def _task_payload(row: Any) -> dict[str, Any]:
     factual_result = _factual_result(row)
     if factual_result is not None and status == TaskStatus.COMPLETED.value:
         payload.update(factual_result)
+    candidate_result = _candidate_result(row)
+    if candidate_result is not None and status == TaskStatus.COMPLETED.value:
+        payload.update(candidate_result)
     return payload
 
 

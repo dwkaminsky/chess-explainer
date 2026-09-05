@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 
+from .candidates import AnalysisMetadata, CandidateMove
 from .facts.models import PositionFacts
 from .fen import normalize_fen
 
@@ -49,6 +50,12 @@ class MateResult(BaseModel):
 TaskFacts = PositionFacts
 
 
+class TaskCandidateAnalysis(AnalysisMetadata):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Literal[1]
+
+
 class TaskResult(BaseModel):
     """Response shape used by the API for queued, running, and terminal rows."""
 
@@ -60,6 +67,8 @@ class TaskResult(BaseModel):
     facts: TaskFacts | None = None
     explanation: StrictStr | None = None
     explanation_version: int | None = None
+    candidate_moves: list[CandidateMove] | None = None
+    candidate_analysis: TaskCandidateAnalysis | None = None
     mate: MateResult | None = None
     error: TaskError | None = None
 
@@ -74,6 +83,7 @@ __all__ = [
     "FenRequest",
     "MateResult",
     "SubmitTaskRequest",
+    "TaskCandidateAnalysis",
     "TaskCreate",
     "TaskError",
     "TaskFacts",

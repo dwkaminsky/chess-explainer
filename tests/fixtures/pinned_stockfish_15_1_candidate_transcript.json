@@ -1,0 +1,150 @@
+{
+  "metadata": {
+    "engine_build": {
+      "name": "Stockfish 15.1",
+      "author": "the Stockfish developers (see AUTHORS file)"
+    },
+    "root_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "options": {
+      "Threads": 1,
+      "Hash": 64,
+      "MultiPV": 3
+    },
+    "capture_search_time_seconds": 0.35,
+    "capture_runtime": "Dockerfile runtime image, Debian stockfish=15.1-4, python-chess 1.999"
+  },
+  "reports": [
+    {
+      "depth": 1,
+      "multipv": 1,
+      "score": {"kind": "cp", "value": 18},
+      "pv": ["e2e4"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 1,
+      "nodes": 57,
+      "time_ms": 1
+    },
+    {
+      "depth": 1,
+      "multipv": 2,
+      "score": {"kind": "cp", "value": 12},
+      "pv": ["g1f3"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 1,
+      "nodes": 57,
+      "time_ms": 1
+    },
+    {
+      "depth": 1,
+      "multipv": 3,
+      "score": {"kind": "cp", "value": 11},
+      "pv": ["d2d4"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 1,
+      "nodes": 57,
+      "time_ms": 1
+    },
+    {
+      "depth": 2,
+      "multipv": 1,
+      "score": {"kind": "cp", "value": 45},
+      "pv": ["d2d4"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 2,
+      "nodes": 165,
+      "time_ms": 1
+    },
+    {
+      "depth": 2,
+      "multipv": 2,
+      "score": {"kind": "cp", "value": 18},
+      "pv": ["e2e4"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 2,
+      "nodes": 165,
+      "time_ms": 1
+    },
+    {
+      "depth": 2,
+      "multipv": 3,
+      "score": {"kind": "cp", "value": 4},
+      "pv": ["g1f3", "a7a6"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 2,
+      "nodes": 165,
+      "time_ms": 1
+    },
+    {
+      "depth": 3,
+      "multipv": 1,
+      "score": {"kind": "cp", "value": 50},
+      "pv": ["c2c4", "a7a6", "e2e4"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 3,
+      "nodes": 272,
+      "time_ms": 2
+    },
+    {
+      "depth": 3,
+      "multipv": 2,
+      "score": {"kind": "cp", "value": 45},
+      "pv": ["d2d4"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 2,
+      "nodes": 272,
+      "time_ms": 2
+    },
+    {
+      "depth": 3,
+      "multipv": 3,
+      "score": {"kind": "cp", "value": 30},
+      "pv": ["g1f3", "a7a6"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 3,
+      "nodes": 272,
+      "time_ms": 2
+    },
+    {
+      "depth": 4,
+      "multipv": 1,
+      "score": {"kind": "cp", "value": 54},
+      "pv": ["d2d4"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 4,
+      "nodes": 452,
+      "time_ms": 2
+    },
+    {
+      "depth": 4,
+      "multipv": 2,
+      "score": {"kind": "cp", "value": 44},
+      "pv": ["g2g3", "c7c6", "f1g2"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 3,
+      "nodes": 452,
+      "time_ms": 2
+    },
+    {
+      "depth": 4,
+      "multipv": 3,
+      "score": {"kind": "cp", "value": 35},
+      "pv": ["e2e4", "c7c6", "d1e2"],
+      "lowerbound": false,
+      "upperbound": false,
+      "seldepth": 3,
+      "nodes": 452,
+      "time_ms": 2
+    }
+  ]
+}
