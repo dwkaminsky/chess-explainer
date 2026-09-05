@@ -27,6 +27,19 @@ SAMPLE_FACTS = PositionFacts(
     files=FileFacts(open=["a", "b", "c", "e"], semi_open=SemiOpenFiles(white=[], black=["d"])),
 )
 
+INITIAL_FACTS = PositionFacts(
+    material=MaterialFacts(
+        white=PieceCounts(queen=0, rook=0, bishop=0, knight=0, pawn=8),
+        black=PieceCounts(queen=0, rook=0, bishop=0, knight=0, pawn=8),
+        white_minus_black=PieceDelta(queen=0, rook=0, bishop=0, knight=0, pawn=0),
+    ),
+    pawns=PawnFacts(
+        white=SidePawnFacts(),
+        black=SidePawnFacts(),
+    ),
+    files=FileFacts(open=[], semi_open=SemiOpenFiles(white=[], black=[])),
+)
+
 PAWNLESS_FACTS = PositionFacts(
     material=MaterialFacts(
         white=PieceCounts(queen=0, rook=0, bishop=0, knight=0, pawn=0),
@@ -64,6 +77,12 @@ def test_render_matches_the_worked_example_and_is_deterministic():
     second = render_factual_explanation(SAMPLE_FACTS)
 
     assert first == second == EXPECTED_SAMPLE_EXPLANATION
+
+
+def test_render_uses_the_initial_position_fallback_for_ordinary_pawn_structure():
+    assert render_factual_explanation(INITIAL_FACTS) == (
+        "Both sides have the same material. Neither side has isolated, doubled, or passed pawns."
+    )
 
 
 def test_render_formats_three_or_more_doubled_pawns_with_the_real_count():

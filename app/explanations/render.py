@@ -140,6 +140,8 @@ def render_factual_explanation(
     else:
         white_sentence = _side_sentence("White", facts.pawns)
         black_sentence = _side_sentence("Black", facts.pawns)
+        if white_sentence is None and black_sentence is None:
+            sentences.append("Neither side has isolated, doubled, or passed pawns.")
         if white_sentence:
             sentences.append(white_sentence)
         if black_sentence:

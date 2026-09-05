@@ -1,5 +1,6 @@
 """Worker lifecycle tests using an in-memory task API and evaluator doubles."""
 
+import logging
 import threading
 from types import SimpleNamespace
 
@@ -7,6 +8,7 @@ import pytest
 
 from app.stockfish import EngineTimeout
 from app.worker import (
+    JsonLogFormatter,
     Worker,
     WorkerConfig,
     WorkerConfigError,
@@ -50,19 +52,47 @@ class FakeTasks:
         self.failed.append((task_id, error_code))
 
 
-def make_worker(tasks, evaluator):
+class CapturingLogger:
+    def __init__(self):
+        self.infos = []
+        self.warnings = []
+        self.exceptions = []
+
+    def info(self, message, extra=None):
+        self.infos.append((message, extra or {}))
+
+    def warning(self, message, extra=None):
+        self.warnings.append((message, extra or {}))
+
+    def exception(self, message, extra=None):
+        self.exceptions.append((message, extra or {}))
+
+
+def make_worker(tasks, evaluator, *, log=None):
     return Worker(
         session_factory=FakeSession,
         task_api=tasks,
         evaluator=evaluator,
         evaluation_config={"engine_path": "unused"},
         stop_event=threading.Event(),
+        log=log,
     )
+
+
+def test_json_log_formatter_emits_factual_elapsed():
+    record = logging.LogRecord("worker", logging.INFO, __file__, 1, "worker transition", (), None)
+    record.task_id = "t1"
+    record.transition = "completed"
+    record.elapsed = 1.23
+    record.factual_elapsed = 0.12
+    payload = JsonLogFormatter().format(record)
+    assert '"factual_elapsed":0.12' in payload
 
 
 def test_worker_claims_evaluates_and_completes():
     tasks = FakeTasks(SimpleNamespace(id="t1", fen=START, attempts=1, lease_token="l1"))
-    worker = make_worker(tasks, lambda fen, config: 34)
+    logger = CapturingLogger()
+    worker = make_worker(tasks, lambda fen, config: 34, log=logger)
     from app import worker as worker_module
 
     build_calls = 0
@@ -91,6 +121,8 @@ def test_worker_claims_evaluates_and_completes():
     assert tasks.completed and tasks.completed[0][0:3] == ("t1", "l1", 34)
     assert tasks.completed[0][3]["version"] == 1
     assert tasks.completed[0][3]["facts"]["material"]["white"]["pawn"] == 8
+    completed_logs = [extra for message, extra in logger.infos if extra.get("transition") == "completed"]
+    assert completed_logs and completed_logs[0]["factual_elapsed"] >= 0
 
 
 def test_worker_retries_engine_failure_then_fails_on_second_attempt():
@@ -143,7 +175,8 @@ def test_success_persistence_error_does_not_become_engine_retry():
 
 def test_factual_generation_failure_is_terminal():
     tasks = FakeTasks(SimpleNamespace(id="t1", fen=START, attempts=1, lease_token="l1"))
-    worker = make_worker(tasks, lambda fen, config: 34)
+    logger = CapturingLogger()
+    worker = make_worker(tasks, lambda fen, config: 34, log=logger)
 
     from app import worker as worker_module
 
@@ -167,3 +200,5 @@ def test_factual_generation_failure_is_terminal():
     assert tasks.retried == []
     assert tasks.failed == [("t1", "FACT_EXTRACTION_FAILED")]
     assert eval_calls == 0
+    factual_warnings = [extra for message, extra in logger.warnings if extra.get("transition") == "factual_generation_failed"]
+    assert factual_warnings and factual_warnings[0]["factual_elapsed"] >= 0

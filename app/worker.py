@@ -91,7 +91,16 @@ class JsonLogFormatter(logging.Formatter):
             "level": record.levelname,
             "message": record.getMessage(),
         }
-        for key in ("task_id", "attempt", "transition", "elapsed", "failure_code", "engine_version", "poll_interval"):
+        for key in (
+            "task_id",
+            "attempt",
+            "transition",
+            "elapsed",
+            "factual_elapsed",
+            "failure_code",
+            "engine_version",
+            "poll_interval",
+        ):
             if hasattr(record, key):
                 payload[key] = getattr(record, key)
         return json.dumps(payload, separators=(",", ":"), default=str)
@@ -362,28 +371,32 @@ class Worker:
         started = time.monotonic()
         self.log.info("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "claimed", "elapsed": 0.0})
         try:
+            factual_started = time.monotonic()
             board = chess.Board(fen)
             factual_bundle = build_factual_result(board)
+            factual_elapsed = time.monotonic() - factual_started
         except (FactExtractionError, ExplanationRenderError, FactualResultValidationError) as exc:
+            factual_elapsed = time.monotonic() - factual_started
             code = getattr(exc, "code", "FACT_EXTRACTION_FAILED")
-            self.log.warning("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "factual_generation_failed", "failure_code": code, "elapsed": time.monotonic() - started})
+            self.log.warning("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "factual_generation_failed", "failure_code": code, "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
             try:
                 self._persist_failure(task, exc, started, retryable=False)
-                self.log.info("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "failed", "failure_code": code, "elapsed": time.monotonic() - started})
+                self.log.info("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "failed", "failure_code": code, "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
             except Exception:
                 self._db_blocked = True
-                self.log.exception("could not persist factual failure", extra={"task_id": str(task_id), "attempt": attempts, "transition": "persistence_failed", "failure_code": "DB_UNAVAILABLE", "elapsed": time.monotonic() - started})
+                self.log.exception("could not persist factual failure", extra={"task_id": str(task_id), "attempt": attempts, "transition": "persistence_failed", "failure_code": "DB_UNAVAILABLE", "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
                 raise
             return True
         except Exception as exc:
+            factual_elapsed = time.monotonic() - factual_started
             code = getattr(exc, "code", "FACT_EXTRACTION_FAILED")
-            self.log.warning("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "factual_generation_failed", "failure_code": code, "elapsed": time.monotonic() - started})
+            self.log.warning("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "factual_generation_failed", "failure_code": code, "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
             try:
                 self._persist_failure(task, exc, started, retryable=False)
-                self.log.info("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "failed", "failure_code": code, "elapsed": time.monotonic() - started})
+                self.log.info("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "failed", "failure_code": code, "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
             except Exception:
                 self._db_blocked = True
-                self.log.exception("could not persist factual failure", extra={"task_id": str(task_id), "attempt": attempts, "transition": "persistence_failed", "failure_code": "DB_UNAVAILABLE", "elapsed": time.monotonic() - started})
+                self.log.exception("could not persist factual failure", extra={"task_id": str(task_id), "attempt": attempts, "transition": "persistence_failed", "failure_code": "DB_UNAVAILABLE", "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
                 raise
             return True
         try:
@@ -392,23 +405,23 @@ class Worker:
                 raise EngineError("evaluator returned an unusable result")
         except Exception as exc:
             code = getattr(exc, "code", "ENGINE_ERROR")
-            self.log.warning("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "evaluation_failed", "failure_code": code, "elapsed": time.monotonic() - started})
+            self.log.warning("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "evaluation_failed", "failure_code": code, "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
             try:
                 self._persist_failure(task, exc, started, retryable=code not in NON_RETRYABLE_FAILURE_CODES)
-                self.log.info("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "retry_or_failed", "failure_code": code, "elapsed": time.monotonic() - started})
+                self.log.info("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "retry_or_failed", "failure_code": code, "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
             except Exception:
                 self._db_blocked = True
-                self.log.exception("could not persist worker failure", extra={"task_id": str(task_id), "attempt": attempts, "transition": "persistence_failed", "failure_code": "DB_UNAVAILABLE", "elapsed": time.monotonic() - started})
+                self.log.exception("could not persist worker failure", extra={"task_id": str(task_id), "attempt": attempts, "transition": "persistence_failed", "failure_code": "DB_UNAVAILABLE", "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
                 raise
             return True
         try:
             if self._persist_success(task, result, factual_bundle.model_dump(mode="json"), started):
-                self.log.info("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "completed", "elapsed": time.monotonic() - started})
+                self.log.info("worker transition", extra={"task_id": str(task_id), "attempt": attempts, "transition": "completed", "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
         except Exception:
             # Keep persistence errors distinct from engine failures.  The
             # guarded lease will make this attempt recoverable later.
             self._db_blocked = True
-            self.log.exception("could not persist worker result", extra={"task_id": str(task_id), "attempt": attempts, "transition": "persistence_failed", "failure_code": "DB_UNAVAILABLE", "elapsed": time.monotonic() - started})
+            self.log.exception("could not persist worker result", extra={"task_id": str(task_id), "attempt": attempts, "transition": "persistence_failed", "failure_code": "DB_UNAVAILABLE", "elapsed": time.monotonic() - started, "factual_elapsed": factual_elapsed})
             raise
         return True
 
