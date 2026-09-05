@@ -1,9 +1,9 @@
 # chess-explainer
 
-This MVP accepts a standard-chess FEN, evaluates it asynchronously with the
-Stockfish binary in the application image, and exposes only `POST /tasks` and
-`GET /tasks/{task_id}`. PostgreSQL is the durable queue and stores results
-across ordinary restarts.
+Explore standard-chess positions with an interactive board, Stockfish evaluations,
+and factual explanations of material, pawn structure, and files. The React frontend
+uses the existing asynchronous `POST /tasks` and `GET /tasks/{task_id}` API.
+PostgreSQL is the durable queue and stores results across ordinary restarts.
 
 ## Requirements and configuration
 
@@ -36,7 +36,9 @@ docker compose ps
 
 Compose starts a healthy private PostgreSQL service, runs the one-shot
 `migrate` service, and starts `api` and `worker` only after migration succeeds.
-The API is published at `127.0.0.1:8000`; PostgreSQL has no host port.
+Open **http://localhost:8080** for the analysis workspace. The frontend container
+serves its compiled assets and proxies `/tasks` to the API on the same origin.
+The API is also published at `127.0.0.1:8000`; PostgreSQL has no host port.
 
 To run the migration explicitly (for example, after changing the migration
 image), use:
@@ -44,6 +46,70 @@ image), use:
 ```sh
 docker compose run --rm migrate
 ```
+
+## Analysis workspace
+
+- Start with an example position or paste a complete, six-field FEN and select
+  **Load** (or press Enter). Editing the text does not change the board until loaded.
+- Click a piece and a highlighted destination to explore a legal move. Castling,
+  en passant, and a choice of all four promotion pieces are supported. The arrow
+  controls navigate the moves explored in this session; playing from an earlier
+  position replaces its continuation. Flip, reset, and copy-FEN controls sit below
+  the board.
+- Select **Analyze position** to submit the visible board. The workspace displays
+  queued/running progress, numeric or mate evaluations, and the explanation saved
+  by the worker. Scores are from White's perspective, regardless of orientation.
+- Open **Material**, **Pawns**, or **Files** for structured details. Selecting a
+  square or file highlights the corresponding board locations.
+- Changing the position clears its old result and stops client polling. Cancel
+  also stops polling; already submitted tasks may still finish on the server.
+  Transient polling failures can resume the same task. Failed or missing tasks
+  start fresh when retried. Polling is bounded to 90 seconds with a 10-second
+  per-request timeout.
+
+The board supports arrow-key navigation, Enter/Space selection, and Escape to
+clear a selection. Promotion uses a native modal with keyboard focus handling.
+The layout adapts to mobile, respects reduced-motion preferences, and bundles
+its fonts and piece artwork locally. Refreshing the page starts a new workspace;
+browser position history is not persisted. The API remains the final authority
+on position legality. FEN-only inputs cannot establish earlier repetition history.
+
+The current explanation contract covers facts, not move recommendations or
+strategic coaching. Legacy results with no factual bundle remain usable and are
+clearly labeled.
+
+### Frontend development and checks
+
+The normal runtime still requires only Docker. Run the frontend's isolated
+regression tests in a container:
+
+```sh
+docker compose --profile test build frontend-test
+docker compose --profile test run --rm frontend-test
+```
+
+For optional local UI development, use Node.js 22.16+ (or a compatible newer LTS):
+
+```sh
+cd frontend
+npm ci
+npm run dev
+```
+
+Vite serves http://127.0.0.1:5173 and proxies `/tasks` to http://127.0.0.1:8000.
+Set `API_PROXY_TARGET` when the backend uses a different address. No frontend
+environment variable or cross-origin configuration is needed in production.
+
+```sh
+cd frontend
+npm test
+npm run build
+```
+
+Unit and component tests cover API contracts, timeout/cancellation/retry behavior,
+stale responses, FEN validation, special chess moves, keyboard navigation, material
+and board highlights, and legacy results. See [frontend/TESTING.md](frontend/TESTING.md)
+for repeatable browser acceptance checks and visual QA instructions.
 
 ## Logs and API usage
 

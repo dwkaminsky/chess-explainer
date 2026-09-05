@@ -25,6 +25,23 @@ x-test-environment: &test-environment
   MAX_REQUEST_BODY_BYTES: "4096"
 
 services:
+  frontend:
+    build:
+      context: ./frontend
+      target: runtime
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend-test:
+    build:
+      context: ./frontend
+      target: test
+    profiles: ["test"]
+
   db:
     image: postgres:16.4-alpine@sha256:5660c2cbfea50c7a9127d17dc4e48543eedd3d7a41a595a2dfa572471e37e64c
     environment:

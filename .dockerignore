@@ -19,3 +19,6 @@ htmlcov/
 .coverage
 tests/__pycache__/
 Chess_*_Plan.md
+frontend/
+output/
+.playwright-cli/
