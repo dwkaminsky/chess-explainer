@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import CheckConstraint
 
-from app.models import TaskStatus
+from app.models import Task, TaskStatus
 from app.tasks import (
     claim_one,
     complete_task,
@@ -13,6 +14,36 @@ from app.tasks import (
     get_task,
     recover_expired,
 )
+
+FACTUAL_RESULT = {
+    "version": 1,
+    "facts": {
+        "material": {
+            "white": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 4},
+            "black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 3},
+            "white_minus_black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 1},
+        },
+        "pawns": {
+            "white": {"isolated": ["d4"], "doubled_files": {}, "passed": ["d4"]},
+            "black": {"isolated": [], "doubled_files": {}, "passed": []},
+        },
+        "files": {
+            "open": ["a", "b", "c", "e"],
+            "semi_open": {"white": [], "black": ["d"]},
+        },
+    },
+    "explanation": "White has one more pawn than Black. White's d4-pawn is isolated and passed. The a-, b-, c-, and e-files are open; the d-file is semi-open for Black.",
+}
+
+
+def test_factual_result_schema_checks_are_declared():
+    constraints = {
+        constraint.name
+        for constraint in Task.__table__.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert "ck_tasks_factual_result_completed_only" in constraints
+    assert "ck_tasks_factual_result_json_object" in constraints
 
 
 @pytest.mark.asyncio
@@ -27,6 +58,7 @@ async def test_create_and_claim_are_durable_state_transitions(db_session):
     assert claimed.attempts == 1
     assert claimed.lease_token is not None
     assert claimed.lease_expires_at is not None
+    assert claimed.factual_result is None
 
 
 @pytest.mark.asyncio
@@ -40,7 +72,13 @@ async def test_stale_completion_is_rejected(db_session):
     # Simulate another worker taking the row after the old lease expired.
     claimed.lease_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
     await db_session.commit()
-    assert await complete_task(db_session, task.id, claimed.lease_token, evaluation_cp=34) is False
+    assert await complete_task(
+        db_session,
+        task.id,
+        claimed.lease_token,
+        evaluation_cp=34,
+        factual_result=FACTUAL_RESULT,
+    ) is False
     current = await get_task(db_session, task.id)
     assert current is not None and current.status == TaskStatus.RUNNING.value
 
@@ -71,6 +109,7 @@ async def test_failure_requeues_once_then_is_terminal(db_session):
     assert current.status == TaskStatus.FAILED.value
     assert current.error_code == "ENGINE_TIMEOUT"
     assert current.lease_token is None
+    assert current.factual_result is None
 
 
 @pytest.mark.asyncio
@@ -80,15 +119,25 @@ async def test_complete_supports_ordinary_and_mate_results(db_session):
 
     first = await claim_one(db_session)
     assert first is not None and first.lease_token is not None
-    assert await complete_task(db_session, ordinary.id, first.lease_token, evaluation_cp=0) is True
-    assert (await get_task(db_session, ordinary.id)).evaluation_cp == 0
+    assert await complete_task(
+        db_session, ordinary.id, first.lease_token, evaluation_cp=0, factual_result=FACTUAL_RESULT
+    ) is True
+    current = await get_task(db_session, ordinary.id)
+    assert current is not None
+    assert current.evaluation_cp == 0
+    assert current.factual_result == FACTUAL_RESULT
 
     mate = await create_task(db_session, "fen two", {})
     await db_session.commit()
     second = await claim_one(db_session)
     assert second is not None and second.lease_token is not None
     assert await complete_task(
-        db_session, mate.id, second.lease_token, mate_winner="black", mate_moves=3
+        db_session,
+        mate.id,
+        second.lease_token,
+        mate_winner="black",
+        mate_moves=3,
+        factual_result=FACTUAL_RESULT,
     ) is True
     result = await get_task(db_session, mate.id)
     assert result is not None and result.mate_winner == "black" and result.mate_moves == 3
@@ -101,7 +150,7 @@ async def test_result_shape_validation(db_session):
     claimed = await claim_one(db_session)
     assert claimed is not None and claimed.lease_token is not None
     with pytest.raises(ValueError):
-        await complete_task(db_session, task.id, claimed.lease_token)
+        await complete_task(db_session, task.id, claimed.lease_token, evaluation_cp=34)
 
 
 @pytest.mark.asyncio
@@ -121,6 +170,7 @@ async def test_first_expired_lease_requeues_and_preserves_attempt_start(db_sessi
     assert current.attempts == 1
     assert current.started_at == started_at
     assert current.lease_token is None
+    assert current.factual_result is None
 
 
 @pytest.mark.asyncio
@@ -144,6 +194,7 @@ async def test_second_expired_lease_is_terminal_failure(db_session):
     assert current.error_code == "LEASE_EXPIRED"
     assert current.finished_at is not None
     assert current.started_at is not None
+    assert current.factual_result is None
 
 
 @pytest.mark.asyncio
@@ -159,6 +210,12 @@ async def test_old_token_rejected_after_expiry_recovery_and_new_claim(db_session
     new = await claim_one(db_session)
     assert new is not None and new.lease_token is not None
     assert new.lease_token != old_token
-    assert await complete_task(db_session, task.id, old_token, evaluation_cp=34) is False
+    assert await complete_task(
+        db_session,
+        task.id,
+        old_token,
+        evaluation_cp=34,
+        factual_result=FACTUAL_RESULT,
+    ) is False
     current = await get_task(db_session, task.id)
     assert current is not None and current.status == TaskStatus.RUNNING.value

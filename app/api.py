@@ -25,8 +25,9 @@ from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse, Response
 
 from .config import get_settings
+from .facts.models import FactualResult
 from .db import get_session
-from .schemas import TaskCreate, TaskStatus
+from .schemas import TaskCreate, TaskResponse, TaskStatus
 from .tasks import create_task, get_task
 
 REQUEST_LIMIT_BYTES = 4 * 1024
@@ -163,6 +164,27 @@ def _status(row: Any) -> str:
     return getattr(value, "value", str(value))
 
 
+def _factual_result(row: Any) -> dict[str, Any] | None:
+    value = _row_value(row, "factual_result")
+    if value is None:
+        return None
+    bundle = FactualResult.model_validate(value)
+    return {
+        "facts": bundle.facts.model_dump(mode="json"),
+        "explanation": bundle.explanation,
+        "explanation_version": bundle.version,
+    }
+
+
+def _serialize_task_response(payload: dict[str, Any]) -> dict[str, Any]:
+    response = TaskResponse.model_validate(payload).model_dump(mode="json")
+    if response.get("mate") is None:
+        response.pop("mate", None)
+    if response.get("error") is None:
+        response.pop("error", None)
+    return response
+
+
 def _task_payload(row: Any) -> dict[str, Any]:
     task_id = _row_value(row, "id", _row_value(row, "task_id"))
     status = _status(row)
@@ -170,6 +192,9 @@ def _task_payload(row: Any) -> dict[str, Any]:
         "task_id": str(task_id),
         "status": status,
         "evaluation": None,
+        "facts": None,
+        "explanation": None,
+        "explanation_version": None,
     }
 
     if status == TaskStatus.COMPLETED.value:
@@ -186,6 +211,10 @@ def _task_payload(row: Any) -> dict[str, Any]:
             "code": _row_value(row, "error_code"),
             "message": _row_value(row, "error_message"),
         }
+
+    factual_result = _factual_result(row)
+    if factual_result is not None and status == TaskStatus.COMPLETED.value:
+        payload.update(factual_result)
     return payload
 
 
@@ -228,7 +257,10 @@ async def poll_task(task_id: UUID, session: Any = Depends(get_session)) -> Respo
         return JSONResponse(status_code=503, content={"detail": "database unavailable"})
     if row is None:
         return JSONResponse(status_code=404, content={"detail": "task not found"})
-    return JSONResponse(content=_task_payload(row))
+    try:
+        return JSONResponse(content=_serialize_task_response(_task_payload(row)))
+    except Exception:
+        return JSONResponse(status_code=503, content={"detail": "task result unavailable"})
 
 
 __all__ = ["REQUEST_LIMIT_BYTES", "app", "poll_task", "submit_task"]

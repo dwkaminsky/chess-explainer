@@ -7,6 +7,25 @@ from fastapi.testclient import TestClient
 from app import api
 
 START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+FACTUAL_RESULT = {
+    "version": 1,
+    "facts": {
+        "material": {
+            "white": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 4},
+            "black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 3},
+            "white_minus_black": {"queen": 0, "rook": 0, "bishop": 0, "knight": 0, "pawn": 1},
+        },
+        "pawns": {
+            "white": {"isolated": ["d4"], "doubled_files": {}, "passed": ["d4"]},
+            "black": {"isolated": [], "doubled_files": {}, "passed": []},
+        },
+        "files": {
+            "open": ["a", "b", "c", "e"],
+            "semi_open": {"white": [], "black": ["d"]},
+        },
+    },
+    "explanation": "White has one more pawn than Black. White's d4-pawn is isolated and passed. The a-, b-, c-, and e-files are open; the d-file is semi-open for Black.",
+}
 
 
 @pytest.fixture()
@@ -42,6 +61,9 @@ def test_submit_returns_202_location_and_queued_poll(client):
         "task_id": str(task_id),
         "status": "queued",
         "evaluation": None,
+        "facts": None,
+        "explanation": None,
+        "explanation_version": None,
     }
     assert polled.headers["cache-control"] == "no-store"
 
@@ -146,6 +168,7 @@ def test_completed_score_mate_and_failure_shapes(client, monkeypatch):
             "status": "completed",
             "mate_winner": "white",
             "mate_moves": 3,
+            "factual_result": FACTUAL_RESULT,
         },
         UUID("00000000-0000-0000-0000-000000000003"): {
             "id": UUID("00000000-0000-0000-0000-000000000003"),
@@ -153,10 +176,56 @@ def test_completed_score_mate_and_failure_shapes(client, monkeypatch):
             "error_code": "ENGINE_TIMEOUT",
             "error_message": "timed out",
         },
+        UUID("00000000-0000-0000-0000-000000000004"): {
+            "id": UUID("00000000-0000-0000-0000-000000000004"),
+            "status": "completed",
+            "evaluation_cp": 123,
+            "factual_result": FACTUAL_RESULT,
+        },
+        UUID("00000000-0000-0000-0000-000000000005"): {
+            "id": UUID("00000000-0000-0000-0000-000000000005"),
+            "status": "completed",
+            "evaluation_cp": 123,
+            "factual_result": {"version": 1, "facts": "bad", "explanation": "still bad"},
+        },
     }
     monkeypatch.setattr(api, "get_task", lambda session, task_id: rows.get(task_id))
-    assert client.get("/tasks/00000000-0000-0000-0000-000000000001").json()["evaluation"] == 0.34
+    first = client.get("/tasks/00000000-0000-0000-0000-000000000001").json()
+    assert first == {
+        "task_id": "00000000-0000-0000-0000-000000000001",
+        "status": "completed",
+        "evaluation": 0.34,
+        "facts": None,
+        "explanation": None,
+        "explanation_version": None,
+    }
     mate = client.get("/tasks/00000000-0000-0000-0000-000000000002").json()
-    assert mate["evaluation"] is None and mate["mate"] == {"winner": "white", "moves": 3}
+    assert mate == {
+        "task_id": "00000000-0000-0000-0000-000000000002",
+        "status": "completed",
+        "evaluation": None,
+        "mate": {"winner": "white", "moves": 3},
+        "facts": FACTUAL_RESULT["facts"],
+        "explanation": FACTUAL_RESULT["explanation"],
+        "explanation_version": 1,
+    }
     failed = client.get("/tasks/00000000-0000-0000-0000-000000000003").json()
-    assert failed["error"]["code"] == "ENGINE_TIMEOUT"
+    assert failed == {
+        "task_id": "00000000-0000-0000-0000-000000000003",
+        "status": "failed",
+        "evaluation": None,
+        "facts": None,
+        "explanation": None,
+        "explanation_version": None,
+        "error": {"code": "ENGINE_TIMEOUT", "message": "timed out"},
+    }
+    factual = client.get("/tasks/00000000-0000-0000-0000-000000000004").json()
+    assert factual == {
+        "task_id": "00000000-0000-0000-0000-000000000004",
+        "status": "completed",
+        "evaluation": 1.23,
+        "facts": FACTUAL_RESULT["facts"],
+        "explanation": FACTUAL_RESULT["explanation"],
+        "explanation_version": 1,
+    }
+    assert client.get("/tasks/00000000-0000-0000-0000-000000000005").status_code == 503
