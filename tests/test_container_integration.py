@@ -3,7 +3,6 @@
 These tests are opt-in because the regular developer test suite intentionally
 uses SQLite and does not require a running service. The Compose ``test``
 service sets RUN_CONTAINER_INTEGRATION=1 and points DATABASE_URL at test-db.
-The end-to-end test drives the ASGI API and one real Worker attempt in-process.
 """
 
 from __future__ import annotations
@@ -24,9 +23,11 @@ import pytest_asyncio
 from sqlalchemy import create_engine as create_sync_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.exc import IntegrityError
 
 from app.api import app
 from app.config import get_settings
+from app.candidates import CandidateResult
 from app.db import create_engine
 from app.facts.extract import build_factual_result
 from app.models import Task, TaskStatus
@@ -66,6 +67,40 @@ EXPECTED_FACTUAL_RESULT = {
     "facts": EXPECTED_FACTS,
     "explanation": EXPECTED_EXPLANATION,
 }
+
+
+def terminal_candidate_result(fen: str) -> dict[str, object]:
+    return {
+        "version": 1,
+        "analysis": {
+            "facts_version": 1,
+            "root_side": "white",
+            "requested_count": 1,
+            "returned_count": 0,
+            "snapshot_depth": None,
+            "search_budget_ms": 1,
+            "max_continuation_plies": 6,
+            "selection_policy": "terminal_position",
+        },
+        "moves": [],
+        "provenance": {
+            "normalized_fen": fen,
+            "engine_build": "stockfish-15.1-4",
+            "network_hash": None,
+            "options": {},
+            "selected_depth": None,
+            "raw_scores": [],
+            "original_pv_lengths": [],
+            "elapsed_attempt_ms": 0,
+            "elapsed_search_ms": 0,
+            "elapsed_replay_ms": 0,
+            "elapsed_render_ms": 0,
+            "incomplete_groups": 0,
+            "bound_only_groups": 0,
+            "duplicate_root_groups": 0,
+            "inconsistent_groups": 0,
+        },
+    }
 
 
 def _run_alembic(*args: str, database_url: str | None = None) -> None:
@@ -154,6 +189,7 @@ async def test_postgres_stale_lease_cannot_complete_new_attempt(postgres_factori
             old_token,
             evaluation_cp=34,
             factual_result=EXPECTED_FACTUAL_RESULT,
+            candidate_result=terminal_candidate_result(FACTUAL_FEN),
         ) is False
 
 
@@ -171,6 +207,29 @@ async def test_real_stockfish_adapter_returns_usable_result():
         },
     )
     assert isinstance(result, (int, MateResult))
+
+
+@pytest.mark.asyncio
+async def test_submit_and_poll_return_queued_state_with_null_candidate_fields():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test", timeout=10.0) as client:
+        response = await client.post("/tasks", json={"fen": FACTUAL_FEN})
+        assert response.status_code == 202, response.text
+        task_id = response.json()["task_id"]
+        UUID(task_id)
+
+        queued = await client.get(f"/tasks/{task_id}")
+        assert queued.status_code == 200, queued.text
+        assert queued.json() == {
+            "task_id": task_id,
+            "status": "queued",
+            "evaluation": None,
+            "facts": None,
+            "explanation": None,
+            "explanation_version": None,
+            "candidate_moves": None,
+            "candidate_analysis": None,
+        }
 
 
 @pytest.mark.asyncio
@@ -192,6 +251,8 @@ async def test_submit_to_completion_through_real_container_stack(postgres_factor
             "facts": None,
             "explanation": None,
             "explanation_version": None,
+            "candidate_moves": None,
+            "candidate_analysis": None,
         }
 
         worker = Worker(evaluation_config=get_settings(), evaluator=evaluate_fen)
@@ -212,17 +273,85 @@ async def test_submit_to_completion_through_real_container_stack(postgres_factor
         assert body["facts"] == EXPECTED_FACTS
         assert body["explanation"] == EXPECTED_EXPLANATION
         assert body["explanation_version"] == 1
-        if body["evaluation"] is None:
-            assert body["mate"]["winner"] in {"white", "black"}
-            assert body["mate"]["moves"] >= 0
-        else:
-            assert isinstance(body["evaluation"], (int, float))
-            assert body.get("mate") is None
+        assert body["candidate_moves"] is not None
+        assert body["candidate_analysis"] is not None
+        assert body["candidate_analysis"]["selection_policy"] == "last_complete_depth"
+        assert body["candidate_analysis"]["root_side"] == "white"
+        assert body["candidate_analysis"]["returned_count"] == min(
+            3, sum(1 for _ in chess.Board(FACTUAL_FEN).legal_moves)
+        )
+        assert all(len(move["continuation"]) <= 6 for move in body["candidate_moves"])
+        assert body["candidate_moves"][0]["evaluation"] == body["evaluation"]
+        assert body["candidate_moves"][0]["mate"] == body.get("mate")
+        root = chess.Board(FACTUAL_FEN)
+        for move in body["candidate_moves"]:
+            board = chess.Board(root.fen())
+            for ply in move["continuation"]:
+                uci = chess.Move.from_uci(ply["uci"])
+                assert uci in board.legal_moves
+                board.push(uci)
+        first_move = body["candidate_moves"][0]
+        assert "from_square" not in first_move["continuation"][0]["mover"]
+        assert "to_square" not in first_move["continuation"][0]["mover"]
+        rook_move = first_move["continuation"][0]["rook_move"]
+        if rook_move is not None:
+            assert "from_square" not in rook_move
+            assert "to_square" not in rook_move
 
         async with factory_one() as session:
             row = await session.get(Task, UUID(task_id))
             assert row is not None
             assert row.factual_result == EXPECTED_FACTUAL_RESULT
+            assert row.candidate_result is not None
+            stored_candidate = CandidateResult.model_validate(row.candidate_result)
+            assert stored_candidate.analysis.returned_count == len(body["candidate_moves"])
+            assert stored_candidate.analysis.returned_count == body["candidate_analysis"]["returned_count"]
+            assert body["candidate_moves"] == [
+                move.model_dump(mode="json", by_alias=True) for move in stored_candidate.moves
+            ]
+            assert body["candidate_analysis"] == {
+                "version": stored_candidate.version,
+                **stored_candidate.analysis.model_dump(mode="json"),
+            }
+
+
+@pytest.mark.asyncio
+async def test_postgres_fresh_install_applies_head_migrations():
+    shared_database_url = os.environ["DATABASE_URL"]
+    temp_database_name = f"chess_fresh_install_{uuid4().hex}"
+    temp_database_url = make_url(shared_database_url).set(database=temp_database_name).render_as_string(
+        hide_password=False
+    )
+    admin_engine = create_sync_engine(_admin_database_url(shared_database_url), isolation_level="AUTOCOMMIT")
+    engine = create_engine(temp_database_url)
+    try:
+        with admin_engine.connect() as connection:
+            connection.execute(text(f'DROP DATABASE IF EXISTS "{temp_database_name}" WITH (FORCE)'))
+            connection.execute(text(f'CREATE DATABASE "{temp_database_name}"'))
+
+        _run_alembic("upgrade", "head", database_url=temp_database_url)
+
+        async with engine.begin() as connection:
+            columns = await connection.execute(
+                text(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'tasks'
+                    """
+                )
+            )
+            column_names = {row[0] for row in columns}
+            assert {"factual_result", "candidate_result", "evaluation_config"} <= column_names
+            count = await connection.execute(text("SELECT count(*) FROM tasks"))
+            assert count.scalar_one() == 0
+    finally:
+        await engine.dispose()
+        with suppress(Exception):
+            with admin_engine.connect() as connection:
+                connection.execute(text(f'DROP DATABASE IF EXISTS "{temp_database_name}" WITH (FORCE)'))
+        admin_engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -249,6 +378,7 @@ async def test_stale_completion_keeps_the_winning_factual_bundle(postgres_factor
             second.lease_token,
             evaluation_cp=34,
             factual_result=winning_bundle,
+            candidate_result=terminal_candidate_result(FACTUAL_FEN),
         ) is True
 
         stale_bundle = build_factual_result(chess.Board(TEST_FEN)).model_dump(mode="json")
@@ -258,15 +388,83 @@ async def test_stale_completion_keeps_the_winning_factual_bundle(postgres_factor
             stale_token,
             evaluation_cp=123,
             factual_result=stale_bundle,
+            candidate_result=terminal_candidate_result(TEST_FEN),
         ) is False
 
         row = await session.get(Task, task.id)
         assert row is not None
         assert row.factual_result == winning_bundle
+        assert row.candidate_result == terminal_candidate_result(FACTUAL_FEN)
 
 
 @pytest.mark.asyncio
-async def test_postgres_upgrade_preserves_old_completed_rows_without_factual_result():
+async def test_postgres_database_session_persistence_preserves_completed_rows_and_candidate_result():
+    database_url = os.environ["DATABASE_URL"]
+    engine = create_engine(database_url)
+    factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    try:
+        async with factory() as session:
+            task = await create_task(session, FACTUAL_FEN, {})
+            await session.commit()
+            claimed = await claim_one(session, lease_seconds=15)
+            assert claimed is not None and claimed.lease_token is not None
+            assert await complete_task(
+                session,
+                task.id,
+                claimed.lease_token,
+                evaluation_cp=34,
+                factual_result=EXPECTED_FACTUAL_RESULT,
+                candidate_result=terminal_candidate_result(FACTUAL_FEN),
+            ) is True
+
+        await engine.dispose()
+        engine = create_engine(database_url)
+        async with async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)() as session:
+            row = await session.get(Task, task.id)
+            assert row is not None
+            assert row.status == TaskStatus.COMPLETED.value
+            assert row.factual_result == EXPECTED_FACTUAL_RESULT
+            assert row.candidate_result == terminal_candidate_result(FACTUAL_FEN)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_postgres_candidate_result_constraints_reject_invalid_shapes(postgres_factories):
+    factory_one, factory_two = postgres_factories
+
+    async with factory_one() as session:
+        task = await create_task(session, FACTUAL_FEN, {})
+        await session.commit()
+        with pytest.raises(IntegrityError):
+            async with session.begin():
+                await session.execute(
+                    text("UPDATE tasks SET candidate_result = CAST(:candidate_result AS jsonb) WHERE id = :id"),
+                    {"candidate_result": "{}", "id": task.id},
+                )
+
+    async with factory_two() as session:
+        task = await create_task(session, FACTUAL_FEN, {})
+        await session.commit()
+        with pytest.raises(IntegrityError):
+            async with session.begin():
+                await session.execute(
+                    text(
+                        """
+                        UPDATE tasks
+                        SET status = 'completed',
+                            evaluation_cp = 0,
+                            finished_at = CURRENT_TIMESTAMP,
+                            candidate_result = CAST(:candidate_result AS jsonb)
+                        WHERE id = :id
+                        """
+                    ),
+                    {"candidate_result": "[]", "id": task.id},
+                )
+
+
+@pytest.mark.asyncio
+async def test_postgres_upgrade_preserves_old_completed_rows_without_candidate_result():
     shared_database_url = os.environ["DATABASE_URL"]
     temp_database_name = f"chess_preservation_{uuid4().hex}"
     temp_database_url = make_url(shared_database_url).set(database=temp_database_name).render_as_string(
@@ -280,7 +478,7 @@ async def test_postgres_upgrade_preserves_old_completed_rows_without_factual_res
             connection.execute(text(f'DROP DATABASE IF EXISTS "{temp_database_name}" WITH (FORCE)'))
             connection.execute(text(f'CREATE DATABASE "{temp_database_name}"'))
 
-        _run_alembic("upgrade", "0001", database_url=temp_database_url)
+        _run_alembic("upgrade", "0002", database_url=temp_database_url)
         async with engine.begin() as connection:
             await connection.execute(
                 text(
@@ -290,6 +488,7 @@ async def test_postgres_upgrade_preserves_old_completed_rows_without_factual_res
                         fen,
                         status,
                         evaluation_cp,
+                        factual_result,
                         mate_winner,
                         mate_moves,
                         attempts,
@@ -307,6 +506,7 @@ async def test_postgres_upgrade_preserves_old_completed_rows_without_factual_res
                         :fen,
                         :status,
                         :evaluation_cp,
+                        CAST(:factual_result AS jsonb),
                         NULL,
                         NULL,
                         :attempts,
@@ -327,6 +527,7 @@ async def test_postgres_upgrade_preserves_old_completed_rows_without_factual_res
                     "fen": FACTUAL_FEN,
                     "status": "completed",
                     "evaluation_cp": 34,
+                    "factual_result": json.dumps(EXPECTED_FACTUAL_RESULT),
                     "attempts": 1,
                     "engine_version": "stockfish-15.1-4",
                     "evaluation_config": json.dumps(
@@ -349,12 +550,13 @@ async def test_postgres_upgrade_preserves_old_completed_rows_without_factual_res
             assert row is not None
             assert row.status == TaskStatus.COMPLETED.value
             assert row.evaluation_cp == 34
+            assert row.factual_result == EXPECTED_FACTUAL_RESULT
             assert row.mate_winner is None
             assert row.mate_moves is None
             assert row.error_code is None
             assert row.error_message is None
             assert row.engine_version == "stockfish-15.1-4"
-            assert row.factual_result is None
+            assert row.candidate_result is None
             assert row.evaluation_config == {
                 "search_time_seconds": 0.2,
                 "hard_attempt_timeout_seconds": 5.0,

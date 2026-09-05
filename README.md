@@ -17,6 +17,9 @@ platform markers and SHA-256 hashes in `requirements.runtime.lock` and
 `requirements.test.lock`.
 The image installs them with pip's `--require-hashes` mode; the aggregate
 `requirements.lock` contains the runtime plus test resolution.
+The default runtime configuration is `SEARCH_TIME_SECONDS=3.0`,
+`CANDIDATE_TARGET=3`, `MAX_CONTINUATION_PLIES=6`,
+`HARD_ATTEMPT_TIMEOUT_SECONDS=10.0`, and `LEASE_SECONDS=30.0`.
 
 Create the local configuration file once:
 
@@ -70,6 +73,8 @@ Stop polling when `status` is `completed` or `failed`. Ordinary results use
 White-perspective pawn units (`34` centipawns is `0.34`); mate results use a
 separate `mate` object and keep `evaluation` as `null`. Poll responses are
 marked `Cache-Control: no-store`.
+The API intentionally exposes only `POST /tasks` and `GET /tasks/{task_id}`;
+Swagger, ReDoc, and OpenAPI routes are disabled.
 
 ## Factual response contract
 
@@ -80,6 +85,15 @@ bundle return those fields as `null`; the existing score or mate result stays
 unchanged. The worker persists the full `factual_result` internally and the
 API maps it onto the response fields when a bundle exists.
 
+The upgraded worker also persists and serves candidate search data. Completed
+responses include `candidate_moves` and `candidate_analysis`; queued, running,
+failed, and legacy completed rows return both as `null`.
+
+`candidate_analysis` is the public analysis metadata plus a `version`. The
+result is produced from one candidate snapshot per task, with Stockfish `MultiPV`
+set from `CANDIDATE_TARGET`, and the factual explanation does not trigger any
+extra engine request.
+
 Worked example:
 
 ```json
@@ -88,7 +102,7 @@ Worked example:
 }
 ```
 
-The corresponding factual payload is:
+The corresponding factual payload excerpt is:
 
 ```json
 {
@@ -123,8 +137,33 @@ The corresponding factual payload is:
 }
 ```
 
+The canonical candidate example is checked in at
+[tests/fixtures/candidate_public_example.json](tests/fixtures/candidate_public_example.json).
+
 The version only changes when the fact definitions, selection rules, or
 templates change. Polling never rewrites historical results with newer prose.
+The factual renderer is deterministic, uses the saved board only, and stays
+within a short prose budget. It may describe material, pawn structure, file
+status, and terminal state, but it does not recommend moves or explain Stockfish
+scores causally.
+
+The candidate collector also has a checked-in incremental transcript captured
+from the pinned Docker runtime (`stockfish=15.1-4`, `MultiPV=3`, one thread,
+64 MiB hash). `tests/fixtures/pinned_stockfish_15_1_candidate_transcript.json`
+contains only JSON-safe report fields and metadata; its scores are a parser and
+checkpoint fixture, not a promise about future live search rankings.
+
+Candidate result details:
+
+- `evaluation` stays in White's pawn-unit perspective.
+- `mate` is present only for mate results; `evaluation` is `null` in that case.
+- `candidate_moves` is a list of candidate lines; the rank-1 candidate matches
+  the top-line result for the task.
+- `candidate_analysis.returned_count` matches the number of candidate moves,
+  while `requested_count` and `max_continuation_plies` show the search request.
+- Public move records use the JSON aliases `from` and `to`.
+- Terminal tasks keep `candidate_moves: []` and a terminal-position analysis;
+  failed and legacy completed rows keep both candidate fields `null`.
 
 ## Tests
 
@@ -136,7 +175,7 @@ The `test` service runs `python -m pytest -q` inside the image so the app
 package is on `sys.path` in that container image.
 
 ```sh
-docker compose --profile test build test
+docker compose --profile test build test-migrate test
 docker compose --profile test run --rm test
 ```
 
@@ -145,6 +184,25 @@ Integration tests use the ASGI application and run one real worker attempt
 in-process, avoiding a background worker racing the queue-isolation fixtures.
 It sets `RUN_CONTAINER_INTEGRATION=1` and uses `chess-explainer-test-data`, so
 tests cannot touch normal task data.
+The release checks also cover a fresh database migrated all the way to `head`,
+an existing database upgraded from `0002` to `0003` without losing old
+completed rows, and a restart-style persistence round trip for completed task
+rows.
+The automated restart-style check is limited to database/session persistence;
+for a full container restart verification, run `docker compose restart api
+worker` during release validation and re-poll a completed task.
+
+Useful release commands:
+
+```sh
+docker compose logs -f api worker migrate
+docker compose run --rm migrate
+docker compose run --rm migrate alembic downgrade -1
+docker compose restart api worker
+```
+
+The rollback example is only for a disposable database copy; the normal data
+volume is preserved by `stop`, `start`, and `restart`.
 
 ## Stop and restart
 

@@ -16,6 +16,9 @@ from typing import Any, Literal
 from sqlalchemy import Select, and_, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pydantic import ValidationError
+
+from .candidates import CandidateResult
 from .facts.models import FactualResult
 from .models import Task, TaskStatus
 
@@ -112,6 +115,7 @@ async def claim_one(
         task.mate_winner = None
         task.mate_moves = None
         task.factual_result = None
+        task.candidate_result = None
         task.error_code = None
         task.error_message = None
         task.engine_version = None
@@ -166,6 +170,7 @@ def _clear_attempt(task: Task) -> None:
     task.mate_winner = None
     task.mate_moves = None
     task.factual_result = None
+    task.candidate_result = None
     task.engine_version = None
     task.finished_at = None
     task.error_code = None
@@ -191,6 +196,7 @@ async def complete_task(
     mate_moves: int | None = None,
     engine_version: str | None = None,
     factual_result: dict[str, Any] | None = None,
+    candidate_result: dict[str, Any] | None = None,
 ) -> bool:
     """Persist a successful attempt if its token and lease are still valid."""
 
@@ -202,7 +208,16 @@ async def complete_task(
         raise ValueError("mate result requires winner and nonnegative moves")
     if factual_result is None:
         raise ValueError("factual_result is required")
-    factual_bundle = FactualResult.model_validate(factual_result).model_dump(mode="json")
+    if candidate_result is None:
+        raise ValueError("candidate_result is required")
+    try:
+        factual_bundle = FactualResult.model_validate(factual_result).model_dump(mode="json")
+    except ValidationError as exc:  # pragma: no cover - validation failure path
+        raise ValueError("factual_result is invalid") from exc
+    try:
+        candidate_bundle = CandidateResult.model_validate(candidate_result).model_dump(mode="json")
+    except ValidationError as exc:  # pragma: no cover - validation failure path
+        raise ValueError("candidate_result is invalid") from exc
     if session.in_transaction():
         await session.commit()
     async with session.begin():
@@ -216,6 +231,7 @@ async def complete_task(
                 mate_moves=mate_moves,
                 engine_version=engine_version,
                 factual_result=factual_bundle,
+                candidate_result=candidate_bundle,
                 error_code=None,
                 error_message=None,
                 lease_token=None,

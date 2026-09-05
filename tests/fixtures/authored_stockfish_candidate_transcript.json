@@ -1,0 +1,70 @@
+[
+  {
+    "depth": 10,
+    "nodes": 1000,
+    "time": 0.011
+  },
+  {
+    "depth": 10,
+    "multipv": 1,
+    "score": {"kind": "cp", "value": 34},
+    "pv": ["e2e4", "e7e5"],
+    "seldepth": 12,
+    "nodes": 1100,
+    "time": 0.012
+  },
+  {
+    "depth": 10,
+    "multipv": 2,
+    "score": {"kind": "cp", "value": 10},
+    "pv": ["d2d4", "d7d5"],
+    "seldepth": 12,
+    "nodes": 1200,
+    "time": 0.013
+  },
+  {
+    "depth": 10,
+    "multipv": 3,
+    "score": {"kind": "cp", "value": 0},
+    "pv": ["g1f3", "g8f6"],
+    "seldepth": 12,
+    "nodes": 1300,
+    "time": 0.014
+  },
+  {
+    "depth": 11,
+    "multipv": 1,
+    "score": {"kind": "cp", "value": 42, "lowerbound": true},
+    "pv": ["c2c4", "e7e5"],
+    "seldepth": 13,
+    "nodes": 1400,
+    "time": 0.015
+  },
+  {
+    "depth": 12,
+    "multipv": 1,
+    "score": {"kind": "cp", "value": 40},
+    "pv": ["e2e4", "e7e5"],
+    "seldepth": 13,
+    "nodes": 1500,
+    "time": 0.016
+  },
+  {
+    "depth": 12,
+    "multipv": 2,
+    "score": {"kind": "cp", "value": 20},
+    "pv": ["e2e4", "d7d5"],
+    "seldepth": 13,
+    "nodes": 1600,
+    "time": 0.017
+  },
+  {
+    "depth": 13,
+    "multipv": 1,
+    "score": {"kind": "cp", "value": 38},
+    "pv": ["e2e4", "c7c5"],
+    "seldepth": 14,
+    "nodes": 1700,
+    "time": 0.018
+  }
+]

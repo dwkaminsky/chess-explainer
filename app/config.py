@@ -7,6 +7,8 @@ from functools import lru_cache
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .constants import ENGINE_CLEANUP_MARGIN
+
 
 class Settings(BaseSettings):
     """Environment-backed settings.
@@ -30,10 +32,12 @@ class Settings(BaseSettings):
 
     engine_path: str = "stockfish"
     engine_version: str | None = None
-    search_time_seconds: float = Field(default=1.0, gt=0)
+    search_time_seconds: float = Field(default=3.0, gt=0)
     hard_attempt_timeout_seconds: float = Field(default=10.0, gt=0)
     engine_threads: int = Field(default=1, ge=1)
     engine_hash_mb: int = Field(default=64, ge=1)
+    candidate_target: int = Field(default=3, ge=1, le=3)
+    max_continuation_plies: int = Field(default=6, ge=1, le=6)
     lease_seconds: float = Field(default=30.0, gt=0)
     poll_interval_seconds: float = Field(default=0.5, gt=0)
     max_request_body_bytes: int = Field(default=4096, ge=1)
@@ -49,20 +53,41 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_lease_budget(self) -> "Settings":
+        if self.hard_attempt_timeout_seconds - self.search_time_seconds < ENGINE_CLEANUP_MARGIN:
+            raise ValueError(
+                "HARD_ATTEMPT_TIMEOUT_SECONDS must exceed SEARCH_TIME_SECONDS by at least the cleanup margin"
+            )
         if self.lease_seconds <= self.hard_attempt_timeout_seconds:
             raise ValueError(
                 "LEASE_SECONDS must be greater than HARD_ATTEMPT_TIMEOUT_SECONDS"
             )
+        if self.engine_threads != 1:
+            raise ValueError("ENGINE_THREADS must be exactly 1")
+        if self.engine_hash_mb != 64:
+            raise ValueError("ENGINE_HASH_MB must be exactly 64")
         return self
 
     def evaluation_config(self) -> dict[str, int | float | str | None]:
         """Return the server-owned settings persisted on each task."""
 
+        search_time = self.search_time_seconds
+        hard_timeout = self.hard_attempt_timeout_seconds
+        threads = self.engine_threads
+        hash_mb = self.engine_hash_mb
+        skill = 20
         return {
-            "search_time_seconds": self.search_time_seconds,
-            "hard_attempt_timeout_seconds": self.hard_attempt_timeout_seconds,
-            "engine_threads": self.engine_threads,
-            "engine_hash_mb": self.engine_hash_mb,
+            "candidate_target": self.candidate_target,
+            "max_continuation_plies": self.max_continuation_plies,
+            "search_time_seconds": search_time,
+            "search_time": search_time,
+            "hard_attempt_timeout_seconds": hard_timeout,
+            "hard_timeout": hard_timeout,
+            "attempt_timeout": hard_timeout,
+            "engine_threads": threads,
+            "threads": threads,
+            "engine_hash_mb": hash_mb,
+            "hash_mb": hash_mb,
+            "skill": skill,
             "engine_path": self.engine_path,
             "engine_version": self.engine_version,
         }

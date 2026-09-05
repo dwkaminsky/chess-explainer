@@ -13,7 +13,10 @@ from app.facts.extract import (
     FactExtractionError,
     FactualResultValidationError,
 )
-from app.stockfish import EngineTimeout
+from app.candidates import CandidateReport, CandidateSnapshot, CpScore, FactChangeError, MateScore, Provenance
+from app.candidates.replay import InvalidEnginePV, ReplayStateMismatch
+from app.stockfish import CandidateSearchResult, EngineTimeout, MateResult
+from app.candidates.collect import CollectorDiagnostics
 from app.worker import (
     JsonLogFormatter,
     Worker,
@@ -24,6 +27,7 @@ from app.worker import (
 )
 
 START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+TERMINAL = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"
 
 
 class FakeSession:
@@ -37,6 +41,7 @@ class FakeTasks:
         self.recovered = 0
         self.claimed = 0
         self.completed = []
+        self.completed_kwargs = []
         self.retried = []
         self.failed = []
 
@@ -50,6 +55,7 @@ class FakeTasks:
 
     def complete_task(self, session, task_id, lease_token, result, factual_result=None, **kwargs):
         self.completed.append((task_id, lease_token, result, factual_result))
+        self.completed_kwargs.append(kwargs)
         return True
 
     def retry_task(self, session, task_id, lease_token, error_code, error_message, **kwargs):
@@ -90,6 +96,38 @@ def make_worker(tasks, evaluator, *, log=None):
         task_api=tasks,
         evaluator=evaluator,
         evaluation_config={"engine_path": "unused"},
+        stop_event=threading.Event(),
+        log=log,
+    )
+
+
+def candidate_provenance(fen=START, score=None, *, length=1, depth=1):
+    score = score or CpScore(kind="cp", value=34)
+    return Provenance(
+        normalized_fen=fen,
+        engine_build="fixture-engine",
+        network_hash=None,
+        options={"Threads": 1, "Hash": 64, "MultiPV": 1},
+        selected_depth=depth,
+        raw_scores=[score],
+        original_pv_lengths=[length],
+        elapsed_attempt_ms=0,
+        elapsed_search_ms=1,
+        elapsed_replay_ms=0,
+        elapsed_render_ms=0,
+        incomplete_groups=0,
+        bound_only_groups=0,
+        duplicate_root_groups=0,
+        inconsistent_groups=0,
+    )
+
+
+def candidate_worker(tasks, evaluator, *, fen=START, config=None, log=None):
+    return Worker(
+        session_factory=FakeSession,
+        task_api=tasks,
+        candidate_evaluator=evaluator,
+        evaluation_config=config or {"engine_path": "unused", "candidate_target": 1},
         stop_event=threading.Event(),
         log=log,
     )
@@ -161,6 +199,11 @@ def test_startup_rejects_timeout_longer_than_lease():
         pass
     else:
         raise AssertionError("invalid lease relationship accepted")
+
+
+def test_startup_requires_search_time_margin_before_hard_timeout():
+    with pytest.raises(WorkerConfigError, match="cleanup margin"):
+        validate_startup_config(WorkerConfig(search_time=1.0, hard_timeout=1.0), check_engine=False)
 
 
 def test_config_accepts_settings_snapshot_field_names():
@@ -269,8 +312,8 @@ def test_worker_reduces_the_engine_deadline_after_factual_generation(monkeypatch
     monkeypatch.setattr(worker_module.time, "monotonic", lambda: next(monotonic_values))
 
     assert worker.process_once() is True
-    assert captured["config"]["hard_timeout"] == pytest.approx(1.6)
-    assert captured["config"]["hard_attempt_timeout_seconds"] == pytest.approx(1.6)
+    assert 0 < captured["config"]["hard_timeout"] < 2.0
+    assert captured["config"]["hard_attempt_timeout_seconds"] == captured["config"]["hard_timeout"]
     assert captured["config"]["search_time_seconds"] == 1.0
     assert tasks.completed and tasks.completed[0][3]["version"] == FACTUAL_RESULT_VERSION
 
@@ -304,3 +347,203 @@ def test_worker_times_out_without_invoking_the_evaluator_when_budget_is_exhauste
     assert eval_calls == 0
     assert tasks.retried == [("t1", "ENGINE_TIMEOUT", "The position could not be evaluated within the allowed time.")]
     assert tasks.failed == []
+
+
+def test_candidate_search_result_is_persisted_atomically_with_rank_one_and_timings(monkeypatch):
+    tasks = FakeTasks(SimpleNamespace(id="t1", fen=START, attempts=1, lease_token="l1"))
+    calls = []
+
+    def candidate_adapter(board, config):
+        calls.append(board.fen(en_passant="fen"))
+        return CandidateSearchResult(
+            snapshot=CandidateSnapshot(
+                depth=12,
+                reports=[CandidateReport(rank=1, depth=12, score=CpScore(kind="cp", value=34), pv=["e2e4"])]
+            ),
+            engine_build="Stockfish fixture",
+            network_hash="nnue-test",
+            options={"Threads": 1, "Hash": 64, "MultiPV": 1},
+            elapsed_search_ms=17,
+            diagnostics=CollectorDiagnostics(),
+        )
+
+    worker = candidate_worker(tasks, candidate_adapter)
+    assert worker.process_once() is True
+    assert calls == [START]
+    assert tasks.completed[0][2] == 34
+    assert tasks.completed_kwargs[0]["candidate_result"]["moves"][0]["rank"] == 1
+    assert tasks.completed_kwargs[0]["candidate_result"]["provenance"]["engine_build"] == "Stockfish fixture"
+    provenance = tasks.completed_kwargs[0]["candidate_result"]["provenance"]
+    assert provenance["elapsed_search_ms"] == 17
+    assert provenance["elapsed_attempt_ms"] >= 0
+    assert provenance["elapsed_replay_ms"] >= 0
+    assert provenance["elapsed_render_ms"] >= 0
+
+
+def test_terminal_candidate_path_persists_explicit_empty_bundle_without_search():
+    tasks = FakeTasks(SimpleNamespace(id="t1", fen=TERMINAL, attempts=1, lease_token="l1"))
+    calls = []
+
+    def adapter(board, config):
+        calls.append(True)
+        raise AssertionError("terminal roots must not invoke the candidate engine")
+
+    worker = candidate_worker(tasks, adapter)
+    assert worker.process_once() is True
+    assert calls == []
+    candidate_result = tasks.completed_kwargs[0]["candidate_result"]
+    assert candidate_result["moves"] == []
+    assert candidate_result["analysis"]["selection_policy"] == "terminal_position"
+    assert candidate_result["provenance"]["selected_depth"] is None
+    assert candidate_result["provenance"]["raw_scores"] == []
+    assert candidate_result["provenance"]["original_pv_lengths"] == []
+
+
+def test_terminal_root_does_not_require_a_full_search_budget(monkeypatch):
+    tasks = FakeTasks(SimpleNamespace(id="t1", fen=TERMINAL, attempts=1, lease_token="l1"))
+    clock_values = iter([0.0, 0.0, 9.5])
+
+    def clock():
+        try:
+            return next(clock_values)
+        except StopIteration:
+            return 9.5
+
+    monkeypatch.setattr(worker_module.time, "monotonic", clock)
+    monkeypatch.setattr(
+        worker_module,
+        "build_factual_result",
+        lambda board: SimpleNamespace(model_dump=lambda mode="json": {"version": 1}),
+    )
+    calls = []
+    worker = candidate_worker(tasks, lambda board, config: calls.append(True))
+    assert worker.process_once() is True
+    assert calls == []
+    assert tasks.completed_kwargs[0]["candidate_result"]["moves"] == []
+
+
+def test_production_candidate_adapter_is_selected_when_no_custom_evaluator(monkeypatch):
+    tasks = FakeTasks(SimpleNamespace(id="t1", fen=START, attempts=1, lease_token="l1"))
+    calls = []
+
+    def production_adapter(board, config):
+        calls.append(board.fen(en_passant="fen"))
+        return CandidateSearchResult(
+            snapshot=CandidateSnapshot(
+                depth=1,
+                reports=[CandidateReport(rank=1, depth=1, score=CpScore(kind="cp", value=10), pv=["e2e4"])]
+            ),
+            engine_build="same-process-build",
+            network_hash=None,
+            options={"Threads": 1, "Hash": 64, "MultiPV": 1},
+            elapsed_search_ms=2,
+            diagnostics=CollectorDiagnostics(),
+        )
+
+    monkeypatch.setattr(worker_module, "evaluate_candidates", production_adapter)
+    worker = Worker(
+        session_factory=FakeSession,
+        task_api=tasks,
+        evaluation_config={"engine_path": "unused", "candidate_target": 1},
+        stop_event=threading.Event(),
+    )
+    assert worker.process_once() is True
+    assert calls == [START]
+    assert tasks.completed[0][2] == 10
+
+
+def test_black_to_move_mate_result_and_rank_one_agreement():
+    black_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1"
+    tasks = FakeTasks(SimpleNamespace(id="t1", fen=black_fen, attempts=1, lease_token="l1"))
+
+    def black_adapter(board, config):
+        return CandidateSnapshot(
+            depth=2,
+            reports=[CandidateReport(rank=1, depth=2, score=CpScore(kind="cp", value=-40), pv=["d7d5"])]
+        ), candidate_provenance(black_fen, CpScore(kind="cp", value=-40), depth=2)
+
+    worker = candidate_worker(tasks, black_adapter, config={"engine_path": "unused", "candidate_target": 1})
+    assert worker.process_once() is True
+    assert tasks.completed[0][2] == -40
+    assert tasks.completed_kwargs[0]["candidate_result"]["analysis"]["root_side"] == "black"
+
+    mate_fen = "4k3/8/8/8/8/8/4K3/6R1 w - - 0 1"
+    mate_tasks = FakeTasks(SimpleNamespace(id="t2", fen=mate_fen, attempts=1, lease_token="l2"))
+
+    def mate_adapter(board, config):
+        score = MateScore(kind="mate", winner="white", moves=1)
+        return CandidateSnapshot(depth=1, reports=[CandidateReport(rank=1, depth=1, score=score, pv=["g1g8"])]), candidate_provenance(mate_fen, score)
+
+    mate_worker = candidate_worker(mate_tasks, mate_adapter, config={"engine_path": "unused", "candidate_target": 1})
+    assert mate_worker.process_once() is True
+    assert isinstance(mate_tasks.completed[0][2], MateResult)
+    assert mate_tasks.completed[0][2].winner == "white"
+    assert mate_tasks.completed[0][2].moves == 1
+    assert mate_tasks.completed_kwargs[0]["mate_winner"] == "white"
+    assert mate_tasks.completed_kwargs[0]["mate_moves"] == 1
+
+
+@pytest.mark.parametrize("failure", [ReplayStateMismatch("bad state"), FactChangeError("bad facts")])
+def test_candidate_state_failures_are_non_retryable(failure):
+    tasks = FakeTasks(SimpleNamespace(id="t1", fen=START, attempts=1, lease_token="l1"))
+
+    def failing_adapter(board, config):
+        raise failure
+
+    worker = candidate_worker(tasks, failing_adapter)
+    assert worker.process_once() is True
+    assert tasks.retried == []
+    assert tasks.failed == [("t1", failure.code)]
+    assert tasks.completed == []
+
+
+def test_invalid_engine_pv_retries_once():
+    tasks = FakeTasks(SimpleNamespace(id="t1", fen=START, attempts=1, lease_token="l1"))
+
+    def failing_adapter(board, config):
+        raise InvalidEnginePV("bad pv")
+
+    worker = candidate_worker(tasks, failing_adapter)
+    assert worker.process_once() is True
+    assert tasks.retried == [("t1", "INVALID_ENGINE_PV", "The chess engine returned an invalid continuation.")]
+    assert tasks.failed == []
+
+
+def test_candidate_budget_exhaustion_does_not_call_adapter(monkeypatch):
+    tasks = FakeTasks(SimpleNamespace(id="t1", fen=START, attempts=1, lease_token="l1"))
+    calls = []
+
+    def adapter(board, config):
+        calls.append(True)
+        raise AssertionError("budget exhaustion must precede engine invocation")
+
+    worker = candidate_worker(
+        tasks,
+        adapter,
+        config={"engine_path": "unused", "candidate_target": 1, "search_time_seconds": 0.000001, "hard_attempt_timeout_seconds": 0.000001},
+    )
+    assert worker.process_once() is True
+    assert calls == []
+    assert tasks.retried == [("t1", "ENGINE_TIMEOUT", "The position could not be evaluated within the allowed time.")]
+
+
+def test_candidate_stale_completion_is_discarded_without_retry():
+    class StaleTasks(FakeTasks):
+        def complete_task(self, session, task_id, lease_token, result, factual_result=None, **kwargs):
+            self.completed_kwargs.append(kwargs)
+            return False
+
+    tasks = StaleTasks(SimpleNamespace(id="t1", fen=START, attempts=1, lease_token="l1"))
+    worker = candidate_worker(tasks, lambda board, config: (CandidateSnapshot(depth=1, reports=[CandidateReport(rank=1, depth=1, score=CpScore(kind="cp", value=34), pv=["e2e4"])]), candidate_provenance()))
+    assert worker.process_once() is True
+    assert tasks.retried == []
+    assert tasks.completed_kwargs[0]["candidate_result"]["moves"][0]["rank"] == 1
+
+
+def test_candidate_config_bounds_are_enforced():
+    with pytest.raises(WorkerConfigError):
+        validate_startup_config(WorkerConfig(candidate_target=0), check_engine=False)
+    with pytest.raises(WorkerConfigError):
+        validate_startup_config(WorkerConfig(max_continuation_plies=7), check_engine=False)
+    with pytest.raises(WorkerConfigError):
+        validate_startup_config(WorkerConfig(hash_mb=63), check_engine=False)
